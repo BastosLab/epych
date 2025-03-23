@@ -243,14 +243,14 @@ class GrandNonparametricClusterTest(statistic.Statistic[T]):
             ldata = self.data["left"].data.magnitude
             rdata = self.data["right"].data.rescale(lunits).magnitude
 
-            dfd = ldata.shape[-1] + rdata.shape[-2] - 2
-            threshold = scipy.stats.f.ppf(1 - self.alpha / 2,
-                                          dfn=ldata.shape[-1] - 1,
-                                          dfd=rdata.shape[-1] - 1)
+            threshold = scipy.stats.f.ppf(
+                1 - self.alpha, dfn=1,
+                dfd=ldata.shape[-1] + rdata.shape[-1] - 2
+            )
             Fs, clusters, pvals, H0s = mne.stats.spatio_temporal_cluster_test(
                 (np.swapaxes(ldata, 0, -1), np.swapaxes(rdata, 0, -1)),
                 n_jobs=-1, n_permutations=self.partitions, out_type="mask",
-                tail=0, threshold=threshold,
+                tail=1, threshold=threshold
             )
             cluster_masks = [clusters[c] for c
                              in np.where(pvals < self.alpha)[0]]
