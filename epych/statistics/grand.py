@@ -244,8 +244,8 @@ class GrandNonparametricClusterTest(statistic.Statistic[T]):
             rdata = self.data["right"].data.rescale(lunits).magnitude
 
             threshold = scipy.stats.f.ppf(
-                1 - self.alpha, dfn=1,
-                dfd=ldata.shape[-1] + rdata.shape[-1] - 2
+                1 - self.alpha, dfn=2 - 1,
+                dfd=ldata.shape[-1] + rdata.shape[-1] - 1
             )
             Fs, clusters, pvals, H0s = mne.stats.spatio_temporal_cluster_test(
                 (np.swapaxes(ldata, 0, -1), np.swapaxes(rdata, 0, -1)),
