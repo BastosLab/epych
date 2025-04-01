@@ -89,7 +89,7 @@ class GrandAverage(statistic.Statistic[T]):
         self._dt = None
         if data is None:
             self._data = {"channels": None, "k": 0, "n": 0,
-                          "sum": np.zeros((*self.iid_shape, 1)),
+                          "sum": None,
                           "timestamps": np.zeros(self.iid_shape[1])}
         self._signal_class = None
 
@@ -118,8 +118,13 @@ class GrandAverage(statistic.Statistic[T]):
 
         running["k"] += 1
         running["n"] += element.num_trials
-        running["sum"] += data.sum(axis=-1, keepdims=True)
-        running["timestamps"] += element.times[:self.num_times]
+
+        if running["sum"] is None:
+            running["sum"] = data.magnitude.sum(axis=-1, keepdims=True) * data.units
+            running["timestamps"] = element.times[:self.num_times]
+        else:
+            running["sum"] += data.magnitude.sum(axis=-1, keepdims=True) * data.units
+            running["timestamps"] += element.times[:self.num_times]
         return running
 
     def heatmap(self, ax=None, fig=None, title=None, vmin=None, vmax=None,
