@@ -228,3 +228,12 @@ class Summary:
             self._stats[entry] = statistic_cls.unpickle(path + "/" + entry)
         self._statistic = statistic_cls
         return self
+
+class TrialwiseSummary(Summary):
+    def results(self):
+        stat_results = {k: v.result() for k, v in self.stats.items()}
+        if all([isinstance(v, signal.Signal) for v in stat_results.values()]):
+            return recording.Sampling(recording.empty_intervals(),
+                                      recording.empty_trials(),
+                                      recording.default_units(), **stat_results)
+        return stat_results
