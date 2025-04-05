@@ -172,8 +172,7 @@ class GrandVariance(statistic.Statistic[T]):
         self._alignment = alignment
         self._mean = mean
         if data is None:
-            self._data = {"diffs": np.zeros((*self.iid_shape, 1)), "k": 0,
-                          "n": 0}
+            self._data = {"diffs": None, "k": 0, "n": 0}
 
     @property
     def alignment(self):
@@ -188,8 +187,14 @@ class GrandVariance(statistic.Statistic[T]):
             data = data[:, :self.alignment.num_times, :]
         running = copy.deepcopy(self.data)
 
-        running["diffs"] += ((data - self.mean.data) ** 2).sum(axis=-1,
-                                                               keepdims=True)
+        if running["diffs"] is None:
+            running["diffs"] = ((data - self.mean.data) ** 2).magnitude.sum(
+                axis=-1, keepdims=True
+            ) * self.mean.data.units
+        else:
+            running["diffs"] += ((data - self.mean.data) ** 2).magnitude.sum(
+                axis=-1, keepdims=True
+            ) * self.mean.data.units
         running["k"] += 1
         running["n"] += element.num_trials
         return running
