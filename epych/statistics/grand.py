@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import mne
 import numpy as np
 import cv2 as cv
+import quantities as pq
 import scipy
 from typing import TypeVar
 
@@ -22,7 +23,7 @@ class GrandConcatenation(statistic.Statistic[T]):
         self._alignment = alignment
         self._dt = None
         if data is None:
-            self._data = {"channels": None, "k": 0, "cat": None,
+            self._data = {"channels": None, "k": 0, "cat": [],
                           "timestamps": np.zeros(self.iid_shape[1])}
         self._signal_class = None
 
@@ -37,7 +38,12 @@ class GrandConcatenation(statistic.Statistic[T]):
         data = element.data
         if self.num_times < element.data.shape[1]:
             data = data[:, :self.num_times, :]
-        running = copy.deepcopy(self.data)
+        running = {
+            "cat": self.data["cat"],
+            "channels": copy.deepcopy(self.data["channels"]),
+            "k": self.data["k"],
+            "timestamps": self.data["timestamps"]
+        }
 
         channels = element.channels.reset_index(drop=True)
         if running["channels"] is None:
@@ -51,15 +57,14 @@ class GrandConcatenation(statistic.Statistic[T]):
         assert hasattr(self._dt, "units")
 
         running["k"] += 1
-        if running["cat"] is None:
-            running["cat"] = data
+        if not running["cat"]:
+            running["cat"] = [data]
         else:
-            data = data.rescale(running["cat"].units)
-            running["cat"] = np.concatenate((running["cat"], data), axis=-1) *\
-                             data.units
+            running["cat"].append(data.rescale(running["cat"][-1].units))
         times = element.times[:self.num_times]
         if not hasattr(running["timestamps"], "units"):
-            running["timestamps"] = running["timestamps"] * times.units
+            running["timestamps"] = pq.Quantity(running["timestamps"],
+                                                times.units)
         else:
             times = times.rescale(running["timestamps"].units)
         running["timestamps"] += times
@@ -79,7 +84,12 @@ class GrandConcatenation(statistic.Statistic[T]):
         for column in channels.columns:
             if channels[column].values.dtype == np.int64:
                 channels[column] //= self.data["k"]
-        return self._signal_class(channels, self.data["cat"], self._dt, times)
+        cat = pq.Quantity(
+            np.concatenate(tuple(data.magnitude for data in self.data["cat"]),
+                           axis=-1),
+            self.data["cat"][-1].units
+        )
+        return self._signal_class(channels, cat, self._dt, times)
 
 class GrandAverage(statistic.Statistic[T]):
     def __init__(self, alignment: alignment.LaminarAlignment, data=None):
