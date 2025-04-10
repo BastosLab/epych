@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import mne
 import numpy as np
 import cv2 as cv
+import quantities as pq
 import scipy
 from typing import TypeVar
 
@@ -22,7 +23,7 @@ class GrandConcatenation(statistic.Statistic[T]):
         self._alignment = alignment
         self._dt = None
         if data is None:
-            self._data = {"channels": None, "k": 0, "cat": None,
+            self._data = {"channels": None, "k": 0, "cat": [],
                           "timestamps": np.zeros(self.iid_shape[1])}
         self._signal_class = None
 
@@ -37,7 +38,12 @@ class GrandConcatenation(statistic.Statistic[T]):
         data = element.data
         if self.num_times < element.data.shape[1]:
             data = data[:, :self.num_times, :]
-        running = copy.deepcopy(self.data)
+        running = {
+            "cat": self.data["cat"],
+            "channels": copy.deepcopy(self.data["channels"]),
+            "k": self.data["k"],
+            "timestamps": self.data["timestamps"]
+        }
 
         channels = element.channels.reset_index(drop=True)
         if running["channels"] is None:
@@ -51,15 +57,14 @@ class GrandConcatenation(statistic.Statistic[T]):
         assert hasattr(self._dt, "units")
 
         running["k"] += 1
-        if running["cat"] is None:
-            running["cat"] = data
+        if not running["cat"]:
+            running["cat"] = [data]
         else:
-            data = data.rescale(running["cat"].units)
-            running["cat"] = np.concatenate((running["cat"], data), axis=-1) *\
-                             data.units
+            running["cat"].append(data.rescale(running["cat"][-1].units))
         times = element.times[:self.num_times]
         if not hasattr(running["timestamps"], "units"):
-            running["timestamps"] = running["timestamps"] * times.units
+            running["timestamps"] = pq.Quantity(running["timestamps"],
+                                                times.units)
         else:
             times = times.rescale(running["timestamps"].units)
         running["timestamps"] += times
@@ -79,7 +84,12 @@ class GrandConcatenation(statistic.Statistic[T]):
         for column in channels.columns:
             if channels[column].values.dtype == np.int64:
                 channels[column] //= self.data["k"]
-        return self._signal_class(channels, self.data["cat"], self._dt, times)
+        cat = pq.Quantity(
+            np.concatenate(tuple(data.magnitude for data in self.data["cat"]),
+                           axis=-1),
+            self.data["cat"][-1].units
+        )
+        return self._signal_class(channels, cat, self._dt, times)
 
 class GrandAverage(statistic.Statistic[T]):
     def __init__(self, alignment: alignment.LaminarAlignment, data=None):
@@ -89,7 +99,7 @@ class GrandAverage(statistic.Statistic[T]):
         self._dt = None
         if data is None:
             self._data = {"channels": None, "k": 0, "n": 0,
-                          "sum": np.zeros((*self.iid_shape, 1)),
+                          "sum": None,
                           "timestamps": np.zeros(self.iid_shape[1])}
         self._signal_class = None
 
@@ -118,8 +128,13 @@ class GrandAverage(statistic.Statistic[T]):
 
         running["k"] += 1
         running["n"] += element.num_trials
-        running["sum"] += data.sum(axis=-1, keepdims=True)
-        running["timestamps"] += element.times[:self.num_times]
+
+        if running["sum"] is None:
+            running["sum"] = data.magnitude.sum(axis=-1, keepdims=True) * data.units
+            running["timestamps"] = element.times[:self.num_times]
+        else:
+            running["sum"] += data.magnitude.sum(axis=-1, keepdims=True) * data.units
+            running["timestamps"] += element.times[:self.num_times]
         return running
 
     def heatmap(self, ax=None, fig=None, title=None, vmin=None, vmax=None,
@@ -167,8 +182,7 @@ class GrandVariance(statistic.Statistic[T]):
         self._alignment = alignment
         self._mean = mean
         if data is None:
-            self._data = {"diffs": np.zeros((*self.iid_shape, 1)), "k": 0,
-                          "n": 0}
+            self._data = {"diffs": None, "k": 0, "n": 0}
 
     @property
     def alignment(self):
@@ -183,8 +197,14 @@ class GrandVariance(statistic.Statistic[T]):
             data = data[:, :self.alignment.num_times, :]
         running = copy.deepcopy(self.data)
 
-        running["diffs"] += ((data - self.mean.data) ** 2).sum(axis=-1,
-                                                               keepdims=True)
+        if running["diffs"] is None:
+            running["diffs"] = ((data - self.mean.data) ** 2).magnitude.sum(
+                axis=-1, keepdims=True
+            ) * self.mean.data.units
+        else:
+            running["diffs"] += ((data - self.mean.data) ** 2).magnitude.sum(
+                axis=-1, keepdims=True
+            ) * self.mean.data.units
         running["k"] += 1
         running["n"] += element.num_trials
         return running
@@ -243,14 +263,14 @@ class GrandNonparametricClusterTest(statistic.Statistic[T]):
             ldata = self.data["left"].data.magnitude
             rdata = self.data["right"].data.rescale(lunits).magnitude
 
-            dfd = ldata.shape[-1] + rdata.shape[-2] - 2
-            threshold = scipy.stats.f.ppf(1 - self.alpha / 2,
-                                          dfn=ldata.shape[-1] - 1,
-                                          dfd=rdata.shape[-1] - 1)
+            threshold = scipy.stats.f.ppf(
+                1 - self.alpha, dfn=2 - 1,
+                dfd=ldata.shape[-1] + rdata.shape[-1] - 1
+            )
             Fs, clusters, pvals, H0s = mne.stats.spatio_temporal_cluster_test(
                 (np.swapaxes(ldata, 0, -1), np.swapaxes(rdata, 0, -1)),
                 n_jobs=-1, n_permutations=self.partitions, out_type="mask",
-                tail=0, threshold=threshold,
+                tail=1, threshold=threshold
             )
             cluster_masks = [clusters[c] for c
                              in np.where(pvals < self.alpha)[0]]
