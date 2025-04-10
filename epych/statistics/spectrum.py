@@ -233,14 +233,14 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
                               freqs=self.freqs[low_idx:high_idx])
 
 class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
-    def __init__(self, df, channels, f0, chunk_trials=4, fmax=150, taper=None,
-                 data=None, path=None, time_window=0.200):
+    def __init__(self, df, channels, f0, chunk_trials=4, fmax=120, taper=None,
+                 data=None, path=None, time_window=0.250):
         if not hasattr(fmax, "units"):
             fmax = np.array(fmax) * pq.Hz
         self._chunk_trials = chunk_trials
         self._df = df.rescale("Hz")
         self._f0 = f0.rescale("Hz")
-        self._freqs = np.arange(0, fmax.item() + 1, 0.5)  * df.units
+        self._freqs = np.arange(0, fmax.item() + 1, 1.)  * df.units
         self._k = 0
         self._taper = taper
         self._time_window = time_window
@@ -272,12 +272,14 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             cfg.method = 'mtmconvol'
             cfg.output = 'pow'
             cfg.polyremoval = 0
+            cfg.pad = 'nextpow2'
             # Temporal resolution trades off against frequency resolution.
             cfg.t_ftimwin = self._time_window
             cfg.taper = self._taper
+            cfg.tapsmofrq = 4
             cfg.toi = np.arange(
                 0, element.times[-1].magnitude - element.times[0].magnitude,
-                0.04
+                0.02
             )
             tfr = spy.freqanalysis(cfg, data)
             tois.append(tfr.time[0])
