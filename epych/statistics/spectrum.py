@@ -2,6 +2,7 @@
 
 import collections
 import dask.array
+import dask.distributed as dd
 import fooof
 import matplotlib.pyplot as plt
 import mne
@@ -33,6 +34,10 @@ decibel = pq.UnitQuantity(
     symbol='dB',
     aliases=['dBs']
 )
+
+NUM_WORKERS = os.cpu_count() * 3 // 4
+cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
+client = dd.Client(cluster)
 
 class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
     def __init__(self, df, channels, f0, fmax=150, freqs=None, taper=None,
