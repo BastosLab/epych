@@ -238,14 +238,13 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
                               freqs=self.freqs[low_idx:high_idx])
 
 class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
-    def __init__(self, df, channels, f0, chunk_trials=4, fmax=120, taper=None,
-                 data=None, path=None, time_window=0.250):
+    def __init__(self, df, channels, f0, fmax=120, taper=None, data=None,
+                 path=None, time_window=0.250):
         if not hasattr(fmax, "units"):
             fmax = np.array(fmax) * pq.Hz
-        self._chunk_trials = chunk_trials
-        self._df = df.rescale("Hz")
+        self._df = (max(df.magnitude, 1 / time_window) * df.units).rescale("Hz")
         self._f0 = f0.rescale("Hz")
-        self._freqs = np.arange(0, fmax.item() + 1, 1.)  * df.units
+        self._freqs = np.arange(0, fmax.item() + 1, self.df.magnitude) * self.df.units
         self._k = 0
         self._taper = taper
         self._time_window = time_window
@@ -254,7 +253,7 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
 
     def apply(self, element: signal.EpochedSignal):
         assert (element.channels == self.channels).all().all()
-        assert element.df == self.df
+        assert element.df.rescale("Hz") <= self.df
         assert element.f0 >= self.f0
 
         element_data = []
@@ -262,8 +261,8 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
         xs = element.data.magnitude - element.data.magnitude.mean(axis=-1,
                                                                   keepdims=True)
         tois = []
-        for c in tqdm(range(0, element.num_trials, self._chunk_trials)):
-            trials = slice(c, c + self._chunk_trials)
+        for c in tqdm(range(0, element.num_trials, NUM_WORKERS)):
+            trials = slice(c, c + NUM_WORKERS)
             trial_xs = mne.EpochsArray(
                 np.moveaxis(xs[:, :, trials], -1, 0),
                 mne.create_info(channels, int(self.f0.item())), proj=False,
@@ -282,10 +281,7 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             cfg.t_ftimwin = self._time_window
             cfg.taper = self._taper
             cfg.tapsmofrq = 4
-            cfg.toi = np.arange(
-                0, element.times[-1].magnitude - element.times[0].magnitude,
-                0.02
-            )
+            cfg.toi = 0.95
             tfr = spy.freqanalysis(cfg, data)
             tois.append(tfr.time[0])
             path, ext = os.path.splitext(tfr.filename)
@@ -302,7 +298,7 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             spy.cleanup(interactive=False)
 
         toi = np.array(tois).mean(axis=0) * element.times[0].units +\
-              element.times[0] + 0.2 * pq.second
+              element.times[0] + self._time_window * pq.second
         self._k += 1
         if self.data is None:
             return (element_data, toi)
