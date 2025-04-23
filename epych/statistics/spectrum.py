@@ -348,13 +348,12 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
                 element_tfrs = element_tfrs[:, :, :, np.newaxis]
             element_tfrs = np.moveaxis(element_tfrs, 2, 0)
             assert len(element_tfrs.shape) == 4
-            tfrs.append(dask.array.from_array(element_tfrs))
+            tfrs.append(element_tfrs)
             ntrials += element_tfrs.shape[-1]
             del element_tfrs
         del elements
-        tfrs = dask.array.concatenate(tfrs, axis=-1)
 
-        pows = tfrs.compute() * pq.mV ** 2 / pq.Hz
+        pows = pq.Quantity(np.concatenate(tfrs, axis=-1), pq.mV ** 2 / pq.Hz)
         return signals.tfr.EpochedTfr(self.channels, pows, self.df,
                                       np.diff(self.times).mean(), self.f0,
                                       self.freqs, self.times)
