@@ -36,8 +36,6 @@ decibel = pq.UnitQuantity(
 )
 
 NUM_WORKERS = os.cpu_count() * 3 // 4
-cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
-client = dd.Client(cluster)
 
 class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
     def __init__(self, df, channels, f0, fmax=150, freqs=None, taper=None,
@@ -255,6 +253,8 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
         assert (element.channels == self.channels).all().all()
         assert element.df.rescale("Hz") <= self.df
         assert element.f0 >= self.f0
+        cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
+        client = dd.Client(cluster)
 
         element_data = []
         channels = [str(ch) for ch in list(self.channels.index.values)]
