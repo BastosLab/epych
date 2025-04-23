@@ -298,8 +298,8 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             del tfr
             spy.cleanup(interactive=False)
 
-        toi = np.array(tois).mean(axis=0) * element.times[0].units +\
-              element.times[0] + self._time_window * pq.second
+        toi = pq.Quantity(np.stack(tois, axis=-1).mean(axis=-1) +\
+                          element.times[0].magnitude, element.times[0].units)
         self._k += 1
         if self.data is None:
             return (element_data, toi)
