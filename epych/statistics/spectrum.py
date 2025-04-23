@@ -236,13 +236,15 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
                               freqs=self.freqs[low_idx:high_idx])
 
 class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
-    def __init__(self, df, channels, f0, fmax=120, taper=None, data=None,
-                 path=None, time_window=0.250):
+    def __init__(self, df, channels, f0, fmax=HIGH_FREQUENCY_BAND[1].magnitude,
+                 taper=None, data=None, path=None, time_window=0.250):
         if not hasattr(fmax, "units"):
             fmax = np.array(fmax) * pq.Hz
         self._df = (max(df.magnitude, 1 / time_window) * df.units).rescale("Hz")
         self._f0 = f0.rescale("Hz")
-        self._freqs = np.arange(0, fmax.item() + 1, self.df.magnitude) * self.df.units
+        self._freqs = pq.Quantity(np.arange(self.df.magnitude, fmax.item() + 1,
+                                            self.df.magnitude),
+                                  self.df.units)
         self._k = 0
         self._taper = taper
         self._time_window = time_window
