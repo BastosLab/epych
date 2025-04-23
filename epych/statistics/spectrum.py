@@ -282,7 +282,6 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             # Temporal resolution trades off against frequency resolution.
             cfg.t_ftimwin = self._time_window
             cfg.taper = self._taper
-            cfg.tapsmofrq = 4
             cfg.toi = 0.95
             tfr = spy.freqanalysis(cfg, data)
             tois.append(tfr.time[0])
