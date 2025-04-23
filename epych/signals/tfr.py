@@ -204,7 +204,6 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
             bxmin = self.sample_at(baseline[0])
             bxmax = self.sample_at(baseline[1])
             ax.axvspan(bxmin, bxmax, alpha=0.1, color='k')
-            ax.annotate("Baseline", (bxmin + 0.5, ymax - 2))
 
         for (event, (time, color)) in events.items():
             xtime = self.sample_at(time)
