@@ -290,7 +290,7 @@ class EvokedSampling(Sampling):
                 xtime = self.signals[sig].sample_at(time)
                 ax.vlines(xtime, ymin, ymax, colors=color,
                           linestyles='dashed', label=event)
-                ax.annotate(event, (xtime + 0.01, ymax))
+                ax.annotate(event, (xtime + 0.5, ymax - 2))
 
         if title is not None:
             fig.suptitle(title, fontsize=16)
