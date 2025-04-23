@@ -297,6 +297,10 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             del trial_xs
             del tfr
             spy.cleanup(interactive=False)
+        client.close()
+        del client
+        cluster.close()
+        del cluster
 
         toi = pq.Quantity(np.stack(tois, axis=-1).mean(axis=-1) +\
                           element.times[0].magnitude, element.times[0].units)
