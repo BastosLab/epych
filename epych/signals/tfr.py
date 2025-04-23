@@ -164,7 +164,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
             ax = fig.add_subplot()
         if ftop is None:
             ftop = self.fmax.item()
-        vlim = 2 * self.data.std() if vlim is None else vlim
+        vlim = 0.8 * self.data.max() if vlim is None else vlim
         if vmax is None:
             vmax = vlim
         if vmin is None:
