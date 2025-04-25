@@ -5,6 +5,7 @@ import functools
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
+import os
 import cv2 as cv
 import quantities as pq
 import scipy
@@ -14,6 +15,7 @@ from .. import plotting, signal, statistic
 
 from . import alignment
 
+NUM_WORKERS = os.cpu_count() * 3 // 4
 T = TypeVar('T', bound=signal.EpochedSignal)
 
 class GrandConcatenation(statistic.Statistic[T]):
@@ -269,8 +271,8 @@ class GrandNonparametricClusterTest(statistic.Statistic[T]):
             )
             Fs, clusters, pvals, H0s = mne.stats.spatio_temporal_cluster_test(
                 (np.swapaxes(ldata, 0, -1), np.swapaxes(rdata, 0, -1)),
-                n_jobs=-1, n_permutations=self.partitions, out_type="mask",
-                tail=1, threshold=threshold
+                n_jobs=NUM_WORKERS, n_permutations=self.partitions,
+                out_type="mask", tail=1, threshold=threshold
             )
             cluster_masks = [clusters[c] for c
                              in np.where(pvals < self.alpha)[0]]

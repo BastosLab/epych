@@ -3,6 +3,7 @@
 import dask.array
 import itertools
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import os
 import pandas as pd
@@ -154,7 +155,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
     def heatmap(self, alpha=None, ax=None, cmap=None, fbottom=0, fig=None,
                 filename=None, ftop=None, title=None, vlim=None, vmin=None,
                 vmax=None, baseline=None, cbar_ends=None,
-                tlabel="Time (seconds)", **events):
+                tlabel="Time in trial (milliseconds)", **events):
         lone = fig is None
         if fig is None:
             fig = plt.figure(figsize=(self.plot_width * 4, 3), dpi=100)
@@ -164,14 +165,14 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
             ax = fig.add_subplot()
         if ftop is None:
             ftop = self.fmax.item()
-        vlim = 2 * self.data.std() if vlim is None else vlim
+        vlim = 0.8 * self.data.max() if vlim is None else vlim
         if vmax is None:
             vmax = vlim
         if vmin is None:
             vmin = -vlim
 
         freqs = self.freqs
-        times = self.times
+        times = self.times.rescale("ms")
         tfrs = self.channel_mean().data.squeeze()
         title = "Spectrogram" if title is None else title
         if tfrs.units.dimensionality.string == "%":
@@ -180,14 +181,16 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
                          vmin=vmin, vmax=vmax, cbar_ends=cbar_ends)
 
         ax.set_xlim(0, len(times))
-        xticks = [int(xtick) for xtick in ax.get_xticks()]
+        spacing = int(200 / int(np.diff(times).mean()))
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(spacing))
+        xticks = [int(xtick) for xtick in ax.get_xticks()][1:-2]
         zero_tick = self.sample_at(0.)
-        zerotick_loc = (np.abs(np.array(xticks) - zero_tick)).argmin()
+        zerotick_loc = ((np.array(xticks) - zero_tick) ** 2).argmin()
         xticks[zerotick_loc] = zero_tick
         xticks[-1] = min(xticks[-1], len(times) - 1)
-        xtick_times = times[xticks].round(decimals=2)
+        xtick_times = times[xticks].round(decimals=0)
         xtick_times[zerotick_loc] = 0. * xtick_times.units
-        ax.set_xticks(xticks, xtick_times)
+        ax.set_xticks(xticks, xtick_times.magnitude)
         ax.set_xlabel(tlabel)
 
         ax.set_ylim(0, tfrs.shape[-1])
@@ -201,7 +204,6 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
             bxmin = self.sample_at(baseline[0])
             bxmax = self.sample_at(baseline[1])
             ax.axvspan(bxmin, bxmax, alpha=0.1, color='k')
-            ax.annotate("Baseline", (bxmin + 0.5, ymax - 1))
 
         for (event, (time, color)) in events.items():
             xtime = self.sample_at(time)
