@@ -270,6 +270,10 @@ class EvokedSampling(Sampling):
              baseline=None, **events):
         if signals is None:
             signals = list(self.signals.keys())
+        if vmin is None and vmax is None:
+            vlims = [sig.data.magnitude.max() for sig in self.signals.values()]
+            vlims = 0.8 * np.mean(vlims)
+            vmin, vmax = (-vlims, vlims) if vlims else (None, None)
         timespan = np.array([sig.times[-1] - sig.times[0] for sig in
                              self.signals.values()]).sum() * 4
         if hasattr(timespan, "units"):
@@ -282,15 +286,24 @@ class EvokedSampling(Sampling):
             if sigtitle is not None:
                 name = sigtitle(sig, self.signals[sig])
             alpha = alphas.get(sig, None)
-            self.signals[sig].plot(alpha=alpha, ax=ax, fig=fig, title=name,
-                                   baseline=baseline, vmin=vmin, vmax=vmax,
-                                   cmap=cmap)
+            img = self.signals[sig].plot(alpha=alpha, ax=ax, fig=fig,
+                                         title=name, baseline=baseline,
+                                         vmin=vmin, vmax=vmax, cbar=False,
+                                         cmap=cmap)
             for (event, (time, color)) in events.items():
                 ymin, ymax = ax.get_ybound()
                 xtime = self.signals[sig].sample_at(time)
                 ax.vlines(xtime, ymin, ymax, colors=color,
                           linestyles='dashed', label=event)
                 ax.annotate(event, (xtime + 0.5, ymax - 2))
+
+        if hasattr(self.signals[sig].data, "units"):
+            label = self.signals[sig].data.units.dimensionality.latex
+            if "%" in label:
+                label = label.replace("%", r"\%")
+        else:
+            label = None
+        cbar = fig.colorbar(img, ax=list(axes.values()), pad=0.01, label=label)
 
         if title is not None:
             fig.suptitle(title, fontsize=16)
