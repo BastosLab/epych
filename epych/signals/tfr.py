@@ -184,15 +184,15 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
                                cbar_ends=cbar_ends)
 
         ax.set_xlim(0, len(times))
-        spacing = int(200 / int(np.diff(times).mean()))
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(spacing))
-        xticks = [int(xtick) for xtick in ax.get_xticks()][1:-2]
+        xticks = ax.get_xticks().astype(int)
         zero_tick = self.sample_at(0.)
         zerotick_loc = ((np.array(xticks) - zero_tick) ** 2).argmin()
-        xticks[zerotick_loc] = zero_tick
-        xticks[-1] = min(xticks[-1], len(times) - 1)
+        xticks = xticks.tolist()
+        xticks.insert(zerotick_loc + 1, zero_tick)
+        if xticks[-1] >= len(times):
+            xticks = xticks[:-1]
+        xticks = np.array(xticks, dtype=int)
         xtick_times = times[xticks].round(decimals=0)
-        xtick_times[zerotick_loc] = 0. * xtick_times.units
         ax.set_xticks(xticks, xtick_times.magnitude.astype(int))
         ax.set_xlabel(tlabel)
 
