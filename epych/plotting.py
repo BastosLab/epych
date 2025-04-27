@@ -49,3 +49,5 @@ def heatmap(fig, ax, data, alpha=None, title=None, cbar=True, vmin=-1e-4,
             cbar.ax.set_yticks(yticks[1:-1], yticklabels[1:-1])
     if title is not None:
         ax.set_title(title)
+
+    return img

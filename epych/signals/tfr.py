@@ -154,8 +154,8 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
 
     def heatmap(self, alpha=None, ax=None, cmap=None, fbottom=0, fig=None,
                 filename=None, ftop=None, title=None, vlim=None, vmin=None,
-                vmax=None, baseline=None, cbar_ends=None,
-                tlabel="Time in trial (milliseconds)", **events):
+                vmax=None, baseline=None, cbar=True, cbar_ends=None,
+                tlabel="Time (milliseconds)", **events):
         lone = fig is None
         if fig is None:
             fig = plt.figure(figsize=(self.plot_width * 4, 3), dpi=100)
@@ -166,6 +166,8 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
         if ftop is None:
             ftop = self.fmax.item()
         vlim = 0.8 * self.data.max() if vlim is None else vlim
+        if vlim == 0.:
+            vlim = 1
         if vmax is None:
             vmax = vlim
         if vmin is None:
@@ -177,8 +179,9 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
         title = "Spectrogram" if title is None else title
         if tfrs.units.dimensionality.string == "%":
             title += " (% change from baseline)"
-        plotting.heatmap(fig, ax, tfrs.T, alpha=alpha, cmap=cmap, title=title,
-                         vmin=vmin, vmax=vmax, cbar_ends=cbar_ends)
+        img = plotting.heatmap(fig, ax, tfrs.T, alpha=alpha, cmap=cmap,
+                               title=title, vmin=vmin, vmax=vmax, cbar=cbar,
+                               cbar_ends=cbar_ends)
 
         ax.set_xlim(0, len(times))
         spacing = int(200 / int(np.diff(times).mean()))
@@ -190,7 +193,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
         xticks[-1] = min(xticks[-1], len(times) - 1)
         xtick_times = times[xticks].round(decimals=0)
         xtick_times[zerotick_loc] = 0. * xtick_times.units
-        ax.set_xticks(xticks, xtick_times.magnitude)
+        ax.set_xticks(xticks, xtick_times.magnitude.astype(int))
         ax.set_xlabel(tlabel)
 
         ax.set_ylim(0, tfrs.shape[-1])
@@ -222,6 +225,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
         if lone:
             plt.show()
             plt.close(fig)
+        return img
 
     def plot(self, *args, **kwargs):
         return self.heatmap(*args, **kwargs)
