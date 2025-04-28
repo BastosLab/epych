@@ -199,7 +199,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
         ax.set_ylim(0, tfrs.shape[-1])
         yticks = [int(ytick) for ytick in ax.get_yticks()]
         yticks[-1] = min(yticks[-1], tfrs.shape[-1] - 1)
-        ax.set_yticks(yticks, ['{0:,.2f}'.format(f) for f in freqs[yticks]])
+        ax.set_yticks(yticks, ['{}'.format(int(f)) for f in freqs[yticks]])
         ymin, ymax = ax.get_ybound()
         ax.set_ylabel("Frequency (Hz)")
 
