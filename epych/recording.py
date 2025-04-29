@@ -271,8 +271,12 @@ class EvokedSampling(Sampling):
         if signals is None:
             signals = list(self.signals.keys())
         if vmin is None and vmax is None:
-            vlims = [sig.data.magnitude.max() for sig in self.signals.values()]
-            vlims = 0.8 * np.mean(vlims)
+            vlims = np.array([
+                sig.data.magnitude.max().round(decimals=1)
+                for k, sig in self.signals.items() if k in signals
+            ])
+            vmaxes = np.nonzero(vlims)[0]
+            vlims = np.mean(vlims[vmaxes]) if len(vmaxes) else None
             vmin, vmax = (-vlims, vlims) if vlims else (None, None)
         timespan = np.array([sig.times[-1] - sig.times[0] for sig in
                              self.signals.values()]).sum() * 4
