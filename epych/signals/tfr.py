@@ -143,9 +143,9 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
     def band_power(self, fbottom, ftop):
         ibot = self.closest_freq(fbottom)
         itop = self.closest_freq(ftop)
-        return signal.EvokedSignal(self.channels,
-                                   self.data[:, :, ibot:itop].mean(axis=2),
-                                   self.dt, self.times)
+        return EvokedPower(self.channels,
+                           self.data[:, :, ibot:itop].mean(axis=2), self.dt,
+                           self.times)
 
     def evoked(self):
         erp = super().evoked()
@@ -274,6 +274,69 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
             fig.savefig(filename, dpi=100)
         plt.show()
         plt.close(fig)
+
+class EvokedPower(signal.EvokedSignal):
+    def heatmap(self, alpha=None, ax=None, cmap=None, fig=None,
+                filename=None, ftop=None, title=None, vlim=None, vmin=None,
+                vmax=None, baseline=None, cbar=True, cbar_ends=None,
+                tlabel="Time (milliseconds)", channel_ticks="location",
+                **events):
+        lone = fig is None
+        if fig is None:
+            fig = plt.figure(figsize=(self.plot_width * 4, 3), dpi=100)
+        if alpha is not None:
+            alpha = alpha.squeeze()
+        if ax is None:
+            ax = fig.add_subplot()
+        vlim = 0.8 * self.data.max() if vlim is None else vlim
+        if vlim == 0.:
+            vlim = 1
+        if vmax is None:
+            vmax = vlim
+        if vmin is None:
+            vmin = -vlim
+
+        times = self.times.rescale("ms")
+        img = plotting.heatmap(fig, ax, self.data.squeeze(), alpha=alpha,
+                               cmap=cmap, title=title, vmin=vmin, vmax=vmax,
+                               cbar=cbar, cbar_ends=cbar_ends)
+
+        ax.set_xlim(0, len(times))
+        xticks = ax.get_xticks().astype(int)
+        zero_tick = self.sample_at(0.)
+        zerotick_loc = ((np.array(xticks) - zero_tick) ** 2).argmin()
+        xticks = xticks.tolist()
+        xticks.insert(zerotick_loc + 1, zero_tick)
+        if xticks[-1] >= len(times):
+            xticks = xticks[:-1]
+        xticks = np.array(xticks, dtype=int)
+        xtick_times = times[xticks].round(decimals=0)
+        ax.set_xticks(xticks, xtick_times.magnitude.astype(int))
+        ax.set_xlabel(tlabel)
+
+        if channel_ticks is not None and channel_ticks in self.channels.columns:
+            self.annotate_channels(ax, channel_ticks)
+
+        if baseline is not None:
+            bxmin = self.sample_at(baseline[0])
+            bxmax = self.sample_at(baseline[1])
+            ax.axvspan(bxmin, bxmax, alpha=0.1, color='k')
+
+        for (event, (time, color)) in events.items():
+            xtime = self.sample_at(time)
+            ax.vlines(xtime, *ax.get_ybound(), colors=color,
+                      linestyles='dashed', label=event)
+            ax.annotate(event, (xtime + 0.5, ymax - 1), color=color)
+
+        if filename is not None:
+            fig.savefig(filename, dpi=100, bbox_inches="tight")
+        if lone:
+            plt.show()
+            plt.close(fig)
+        return img
+
+    def plot(self, *args, **kwargs):
+        return self.heatmap(*args, **kwargs)
 
 class BandPower(signal.Signal):
     def __init__(self, bands: pd.DataFrame, data, dt, timestamps):
