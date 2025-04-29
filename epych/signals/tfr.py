@@ -344,7 +344,7 @@ class BandPower(signal.Signal):
 
     def __replace__(self, /, **changes):
         parameters = {field: changes.get(field, getattr(self, field)) for field
-                      in ["channels", "data", "dt", "freqs", "times"]}
+                      in ["bands", "channels", "data", "dt", "times"]}
         return self.__class__(*parameters.values())
 
 class EpochedBandPower(BandPower, signal.EpochedSignal):
