@@ -276,7 +276,7 @@ class EvokedSampling(Sampling):
                 for k, sig in self.signals.items() if k in signals
             ])
             vmaxes = np.nonzero(vlims)[0]
-            vlims = np.mean(vlims[vmaxes]) if len(vmaxes) else None
+            vlims = np.max(vlims[vmaxes]) if len(vmaxes) else None
             vmin, vmax = (-vlims, vlims) if vlims else (None, None)
         timespan = np.array([sig.times[-1] - sig.times[0] for sig in
                              self.signals.values()]).sum() * 4
