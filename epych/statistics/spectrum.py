@@ -81,6 +81,8 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
         assert (element.channels.location == self.channels.location).all().all()
         assert np.isclose(element.df.magnitude, self.df.magnitude)
         assert element.f0.magnitude >= self.f0.magnitude
+        cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
+        client = dd.Client(cluster)
 
         channels = [str(ch) for ch in list(self.channels.index.values)]
         xs = mne.EpochsArray(np.moveaxis(element.data.magnitude, -1, 0),
@@ -104,6 +106,10 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
 
         del xs
         del data
+        client.close()
+        del client
+        cluster.close()
+        del cluster
 
         if self.data is None:
             return psd
