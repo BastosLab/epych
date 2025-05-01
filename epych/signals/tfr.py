@@ -23,7 +23,7 @@ class TimeFrequencyRepr(signal.Signal):
     def band_power(self, fbottom, ftop):
         raise NotImplementedError
 
-    def baseline(self, start, end, decibels=False):
+    def baseline(self, start, end, output="pows"):
         first = np.abs(self.times - start).argmin()
         last = np.abs(self.times - end).argmin()
         base_mean = self.data[:, first:last, :].magnitude.mean(
@@ -31,12 +31,14 @@ class TimeFrequencyRepr(signal.Signal):
         )
         base_mean = base_mean * self.data.units
 
-        if decibels and self.data.units == spectrum.decibel:
+        if output == 'decibels' and self.data.units == spectrum.decibel:
             tfrs = self.data - base_mean
-        elif decibels and self.data.units != spectrum.decibel:
+        elif output == 'decibels' and self.data.units != spectrum.decibel:
             tfrs = 10 * np.log10(self.data / base_mean) * spectrum.decibel
-        else:
+        elif output == 'percentage':
             tfrs = (self.data - base_mean) / base_mean * 100 * pq.percent
+        elif output == "pows":
+            tfrs = self.data / base_mean
         return self.__replace__(data=tfrs)
 
     def channel_depths(self, column=None):
