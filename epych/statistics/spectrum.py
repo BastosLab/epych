@@ -284,8 +284,6 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
 
         element_data = []
         channels = [str(ch) for ch in list(self.channels.index.values)]
-        xs = element.data.magnitude - element.data.magnitude.mean(axis=-1,
-                                                                  keepdims=True)
         tois = []
         for c in tqdm(range(0, element.num_trials, NUM_WORKERS)):
             trials = slice(c, c + NUM_WORKERS)
