@@ -77,6 +77,25 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             laminar_labels.append(layer)
         ax.set_yticks(minortick_locs, laminar_labels, minor=True)
 
+    def aperiodic_parameters(self, channel_mean=True, mode="knee"):
+        if channel_mean:
+            fm = fooof.FOOOF(verbose=False, aperiodic_mode=mode)
+            fm.fit(self.freqs.magnitude, self.data.mean(0).mean(-1).magnitude,
+                   (self.freqs[0].magnitude, self.freqs[-1].magnitude))
+            return fm.get_params("aperiodic_params")
+        else:
+            fg = fooof.FOOOFGroup(verbose=False, aperiodic_mode=mode)
+            powers = self.data.mean(axis=-1, keepdims=False)
+            fg.fit(self.freqs.magnitude, powers.magnitude, n_jobs=-1,
+                   freq_range=(self.freqs[0].magnitude,
+                               self.freqs[-1].magnitude))
+
+            aperiodic = []
+            for chan in range(len(fg.get_results())):
+                fm = fg.get_fooof(chan)
+                aperiodic.append(fm.get_params("aperiodic_params"))
+            return np.stack(aperiodic, axis=0)[:, :, np.newaxis]
+
     def apply(self, element: signal.EpochedSignal):
         assert (element.channels.location == self.channels.location).all().all()
         assert np.isclose(element.df.magnitude, self.df.magnitude)
@@ -102,7 +121,7 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
         cfg.polyremoval = 0
         cfg.taper = self._taper
         psd = np.stack(spy.freqanalysis(cfg, data).show(), axis=-1)
-        psd = np.moveaxis(psd, 0, 1)
+        psd = pq.Quantity(np.moveaxis(psd, 0, 1), pq.mV ** 2 / pq.Hz)
 
         del xs
         del data
