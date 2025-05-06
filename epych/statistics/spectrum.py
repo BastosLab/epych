@@ -77,7 +77,7 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             laminar_labels.append(layer)
         ax.set_yticks(minortick_locs, laminar_labels, minor=True)
 
-    def aperiodic_parameters(self, channel_mean=True, mode="knee"):
+    def aperiodic_parameters(self, channel_mean=False, mode="fixed"):
         if channel_mean:
             fm = fooof.FOOOF(verbose=False, aperiodic_mode=mode)
             fm.fit(self.freqs.magnitude, self.data.mean(0).mean(-1).magnitude,
@@ -226,7 +226,7 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
     def result(self):
         return self.data.mean(axis=-1)
 
-    def oscillatory(self, channel_mean=True, mode="knee"):
+    def oscillatory(self, channel_mean=False, mode="fixed"):
         if channel_mean:
             fm = fooof.FOOOF(verbose=False, aperiodic_mode=mode)
             fm.fit(self.freqs, self.data.magnitude.mean(0).mean(-1),
