@@ -118,21 +118,33 @@ class EpochedTfr(TimeFrequencyRepr, signal.EpochedSignal):
                                     self.dt, self.times)
 
     def evoked(self):
-        erp = super().evoked()
-        return EvokedTfr(erp.channels, erp.data, erp.df, erp.dt, erp.f0,
-                         self.freqs, erp.times)
+        data = pq.Quantity(self.data.magnitude.mean(-1, keepdims=True),
+                           self.data.units)
+        return EvokedTfr(self.channels, data, self.df, self.dt, self.f0,
+                         self.freqs, self.times)
 
-    def oscillatory(self, channel_mean=False, mode="fixed"):
+    def oscillatory(self, channel_mean=False, mode="fixed", space="linear"):
         _, freqs, aperiodic = self.power_spectrum().oscillatory(channel_mean,
-                                                                mode)
-        aperiodic = aperiodic[:, np.newaxis, :, :]
-        tfr = self.select_freqs(freqs[0], freqs[-1])
-        return tfr.fmap(lambda data: data / aperiodic * data.units)
+                                                                mode, space)
+        return self.select_freqs(freqs[0],
+                                 freqs[-1]).remove_aperiodic(aperiodic, space)
 
     def power_spectrum(self):
         return spectrum.PowerSpectrum(self.df, self.channels, self.f0,
                                       fmax=self.freqs[-1], freqs=self.freqs,
                                       data=self.data.mean(axis=1))
+
+    def remove_aperiodic(self, aperiodic, space="linear"):
+        aperiodic = aperiodic[:, np.newaxis, :, :]
+        if space == "linear":
+            return self.fmap(lambda data: data.magnitude / aperiodic *\
+                                          pq.dimensionless)
+        elif space == "log":
+            return self.fmap(
+                lambda data: 10 * (np.log10(data.magnitude) - aperiodic) *\
+                             spectrum.decibel
+            )
+        raise NotImplementedError
 
 class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
     def __init__(self, channels: pd.DataFrame, data, df, dt, f0, freqs,
