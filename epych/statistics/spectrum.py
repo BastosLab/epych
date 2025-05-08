@@ -10,6 +10,7 @@ import numpy as np
 import os
 import pandas as pd
 import quantities as pq
+import scipy
 import scipy.fft as fft
 from statistics import median
 import syncopy as spy
@@ -34,6 +35,24 @@ decibel = pq.UnitQuantity(
     symbol='dB',
     aliases=['dBs']
 )
+
+def deciblize(data):
+    return 10 * np.log10(data.magnitude) * decibel
+
+def undeciblize(data):
+    return np.power(10, data.magnitude / 10) * pq.dimensionless
+
+def decib_mean_dedecib(data, axis=-1, keepdims=False):
+    has_units = hasattr(data, "units")
+    if has_units:
+        data = data.magnitude
+    logmeanexp = scipy.special.logsumexp(np.log(10) * data / 10, axis=axis,
+                                         keepdims=keepdims) -\
+                 np.log(data.shape[axis])
+    result = 10 / np.log(10) * logmeanexp
+    if has_units:
+        result = pq.Quantity(result, decibel)
+    return result
 
 NUM_WORKERS = os.cpu_count() * 3 // 4
 
