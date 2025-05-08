@@ -245,13 +245,13 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
     def result(self):
         return self.data.mean(axis=-1)
 
-    def oscillatory(self, channel_mean=False, mode="fixed"):
+    def oscillatory(self, channel_mean=False, mode="fixed", space="linear"):
         if channel_mean:
             fm = fooof.FOOOF(verbose=False, aperiodic_mode=mode)
             fm.fit(self.freqs, self.data.magnitude.mean(0).mean(-1),
                    (self.freqs[0], self.freqs[-1]))
             spec = self.select_freqs(fm.freqs[0], fm.freqs[-1])
-            aperiodic = fm.get_model(component='aperiodic', space='linear')
+            aperiodic = fm.get_model(component='aperiodic', space=space)
             aperiodic = aperiodic[np.newaxis, :, np.newaxis]
             return (spec.fmap(lambda data: data / aperiodic * data.units),
                     fm.freqs, aperiodic)
@@ -264,11 +264,20 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             aperiodic = []
             for chan in range(len(fg.get_results())):
                 fm = fg.get_fooof(chan)
-                aperiodic.append(fm.get_model('aperiodic', 'linear'))
+                aperiodic.append(fm.get_model('aperiodic', space))
             aperiodic = np.stack(aperiodic, axis=0)[:, :, np.newaxis]
             spec = self.select_freqs(fg.freqs[0], fg.freqs[-1])
-            return (spec.fmap(lambda data: data / aperiodic * data.units),
-                    fg.freqs, aperiodic)
+            return (spec.remove_aperiodic(aperiodic, space), fg.freqs,
+                    aperiodic)
+
+    def remove_aperiodic(self, aperiodic, space="linear"):
+        if space == "linear":
+            return self.fmap(lambda data: data / aperiodic * data.units)
+        elif space == "log":
+            return self.fmap(
+                lambda data: 10*(np.log10(data.magnitude) - aperiodic)*decibel
+            )
+        raise NotImplementedError
 
     def select_freqs(self, low, high):
         low_idx = np.argmin(np.abs(self.freqs - low))
