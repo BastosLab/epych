@@ -104,8 +104,8 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             return fm.get_params("aperiodic_params")
         else:
             fg = fooof.FOOOFGroup(verbose=False, aperiodic_mode=mode)
-            powers = self.data.mean(axis=-1, keepdims=False)
-            fg.fit(self.freqs.magnitude, powers.magnitude, n_jobs=-1,
+            powers = self.data.magnitude.mean(axis=-1, keepdims=False)
+            fg.fit(self.freqs.magnitude, powers, n_jobs=-1,
                    freq_range=(self.freqs[0].magnitude,
                                self.freqs[-1].magnitude))
 
