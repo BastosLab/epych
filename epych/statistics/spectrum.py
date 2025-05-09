@@ -192,6 +192,26 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
     def fmax(self):
         return self._freqs[-1]
 
+    def fooofed(self, channel_mean=False, mode="fixed", space="linear"):
+        if channel_mean:
+            fm = fooof.FOOOF(verbose=False, aperiodic_mode=mode)
+            fm.fit(self.freqs.magnitude, self.data.magnitude.mean(0).mean(-1),
+                   (self.freqs[0].magnitude, self.freqs[-1].magnitude))
+            fit = fm.get_model(component='full', space=space)
+            return fit[np.newaxis, :, np.newaxis]
+        else:
+            fg = fooof.FOOOFGroup(verbose=False, aperiodic_mode=mode)
+            powers = self.data.magnitude.mean(axis=-1, keepdims=False)
+            fg.fit(self.freqs.magnitude, powers, n_jobs=-1,
+                   freq_range=(self.freqs[0].magnitude,
+                               self.freqs[-1].magnitude))
+
+            fit = []
+            for chan in range(len(fg.get_results())):
+                fm = fg.get_fooof(chan)
+                fit.append(fm.get_model('full', space))
+            return np.stack(fit, axis=0)[:, :, np.newaxis]
+
     @property
     def freqs(self):
         return self._freqs
