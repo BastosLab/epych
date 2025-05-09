@@ -273,8 +273,8 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             spec = self.select_freqs(fm.freqs[0], fm.freqs[-1])
             aperiodic = fm.get_model(component='aperiodic', space=space)
             aperiodic = aperiodic[np.newaxis, :, np.newaxis]
-            return (spec.fmap(lambda data: data / aperiodic * data.units),
-                    fm.freqs, aperiodic)
+            return (spec.remove_aperiodic(aperiodic, space), fm.freqs,
+                    aperiodic)
         else:
             fg = fooof.FOOOFGroup(verbose=False, aperiodic_mode=mode)
             powers = self.data.magnitude.mean(axis=-1, keepdims=False)
