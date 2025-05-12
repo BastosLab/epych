@@ -422,7 +422,7 @@ class EvokedSignal(EpochedSignal):
 
     def heatmap(self, alpha=None, ax=None, fig=None, filename=None, title=None,
                 vmin=None, vmax=None, origin="lower", channel_ticks="location",
-                cmap=None, callback=None, cbar=False):
+                baseline=None, cmap=None, callback=None, cbar=False):
         if ax is None:
             ax = plt.gca()
         figure = plt.gcf() if fig is None else fig
@@ -430,20 +430,24 @@ class EvokedSignal(EpochedSignal):
         data = self.data.squeeze()
         if alpha is not None:
             alpha = alpha.squeeze()
-        plotting.heatmap(figure, ax, data, alpha=alpha, title=title, vmin=vmin,
-                         vmax=vmax, cmap=cmap,
-                         cbar=cbar or (vmin is None and vmax is None))
+        img = plotting.heatmap(figure, ax, data, alpha=alpha, title=title,
+                               vmin=vmin, vmax=vmax, cmap=cmap,
+                               cbar=cbar or (vmin is None and vmax is None))
 
+        times = self.times.rescale('ms')
         num_xticks = len(ax.get_xticks())
         xtick_locs = np.linspace(0, data.shape[1], num_xticks)
-        xticks = np.linspace(self.times[0], self.times[-1], num_xticks)
+        xticks = np.linspace(times[0], times[-1], num_xticks)
         xticks = ["%0.2f" % t for t in xticks]
         ax.set_xticks(xtick_locs, xticks)
-        if hasattr(self.times, 'units'):
-            unit = list(self.times.units.dimensionality.keys())[0].name
-            ax.set_xlabel((unit + 's').capitalize())
+        ax.set_xlabel("Time (%s)" % times.units.dimensionality.string)
         if channel_ticks is not None and channel_ticks in self.channels.columns:
             self.annotate_channels(ax, channel_ticks)
+
+        if baseline is not None:
+            bxmin = self.sample_at(baseline[0])
+            bxmax = self.sample_at(baseline[1])
+            ax.axvspan(bxmin, bxmax, alpha=0.1, color='k')
 
         if callback is not None:
             callback(self, ax)
@@ -452,6 +456,7 @@ class EvokedSignal(EpochedSignal):
             figure.savefig(filename)
             if fig is None:
                 plt.close(figure)
+        return img
 
     def plot(self, *args, **kwargs):
         if "events" in kwargs:
