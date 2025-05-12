@@ -267,12 +267,12 @@ class EvokedSampling(Sampling):
 
     def plot(self, alphas={}, vmin=None, vmax=None, dpi=100, figure=None,
              figargs={}, sigtitle=None, cmap=None, signals=None, title=None,
-             baseline=None, **events):
+             baseline=None, decimals=1, **events):
         if signals is None:
             signals = list(self.signals.keys())
         if vmin is None and vmax is None:
             vlims = np.array([
-                sig.data.magnitude.max().round(decimals=1)
+                sig.data.magnitude.max().round(decimals=decimals)
                 for k, sig in self.signals.items() if k in signals
             ])
             vmaxes = np.nonzero(vlims)[0]
@@ -297,8 +297,8 @@ class EvokedSampling(Sampling):
             for (event, (time, color)) in events.items():
                 ymin, ymax = ax.get_ybound()
                 xtime = self.signals[sig].sample_at(time)
-                ax.vlines(xtime, ymin, ymax, colors=color,
-                          linestyles='dashed', label=event)
+                ax.vlines(xtime, ymin, ymax, colors=color, linestyles='dashed',
+                          label=event)
                 ax.annotate(event, (xtime + 0.5, ymax - 2))
 
         if hasattr(self.signals[sig].data, "units"):
