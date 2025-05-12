@@ -4,6 +4,7 @@ import collections
 import dask.array
 import dask.distributed as dd
 import fooof
+from fooof.utils.reports import methods_report_text
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
@@ -192,12 +193,15 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
     def fmax(self):
         return self._freqs[-1]
 
-    def fooofed(self, channel_mean=False, mode="fixed", space="linear"):
+    def fooofed(self, channel_mean=False, mode="fixed", space="linear",
+                report=False):
         if channel_mean:
             fm = fooof.FOOOF(verbose=False, aperiodic_mode=mode)
             fm.fit(self.freqs.magnitude, self.data.magnitude.mean(0).mean(-1),
                    (self.freqs[0].magnitude, self.freqs[-1].magnitude))
             fit = fm.get_model(component='full', space=space)
+            if report:
+                methods_report_text(fm)
             return fit[np.newaxis, :, np.newaxis]
         else:
             fg = fooof.FOOOFGroup(verbose=False, aperiodic_mode=mode)
@@ -210,6 +214,8 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             for chan in range(len(fg.get_results())):
                 fm = fg.get_fooof(chan)
                 fit.append(fm.get_model('full', space))
+            if report:
+                methods_report_text(fg)
             return np.stack(fit, axis=0)[:, :, np.newaxis]
 
     @property
