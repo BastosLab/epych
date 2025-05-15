@@ -58,18 +58,21 @@ def decib_mean_dedecib(data, axis=-1, keepdims=False):
 NUM_WORKERS = os.cpu_count() * 3 // 4
 
 class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
-    def __init__(self, df, channels, f0, fmax=150, freqs=None, taper=None,
-                 data=None):
+    def __init__(self, df, channels, f0, fmax=150, taper=None, freqs=None,
+                 data=None, time_window=0.250):
         if not hasattr(fmax, "units"):
             fmax = np.array(fmax) * pq.Hz
-        self._df = df.rescale("Hz")
+        self._df = (max(df.magnitude, 1 / time_window) * df.units).rescale("Hz")
         self._f0 = f0.rescale("Hz")
         if freqs is None:
-            self._freqs = np.arange(0, fmax.item(), df.item())
-            self._freqs = (self._freqs + df.item()) * df.units
+            self._freqs = pq.Quantity(np.arange(self.df.magnitude,
+                                                fmax.item() + 1,
+                                                self.df.magnitude),
+                                      self.df.units)
         else:
             self._freqs = freqs
         self._taper = taper
+        self._time_window = time_window
         super().__init__(channels, (len(self._freqs),), data=data)
 
     def annotate_channels(self, ax, key, ycolumn=None):
@@ -118,37 +121,51 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
 
     def apply(self, element: signal.EpochedSignal):
         assert (element.channels.location == self.channels.location).all().all()
-        assert np.isclose(element.df.magnitude, self.df.magnitude)
+        assert element.df.rescale("Hz") <= self.df
         assert element.f0.magnitude >= self.f0.magnitude
         cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
         client = dd.Client(cluster)
 
         channels = [str(ch) for ch in list(self.channels.index.values)]
-        xs = mne.EpochsArray(np.moveaxis(element.data.magnitude, -1, 0),
-                             mne.create_info(channels, int(self.f0.item())),
-                             proj=False)
+        psds = []
+        for c in tqdm(range(0, element.num_trials, NUM_WORKERS)):
+            trials = slice(c, c + NUM_WORKERS)
+            trial_xs = mne.EpochsArray(
+                np.moveaxis(element.data.magnitude[:, :, trials], -1, 0),
+                mne.create_info(channels, int(self.f0.item())), proj=False,
+            )
 
-        data = spy.mne_epochs_to_tldata(xs)
-        cfg = spy.get_defaults(spy.freqanalysis)
+            data = spy.mne_epochs_to_tldata(trial_xs)
+            cfg = spy.get_defaults(spy.freqanalysis)
 
-        cfg.foi = self.freqs.magnitude.squeeze()
-        cfg.ft_compat = True
-        cfg.keeptrials = 'yes'
-        cfg.method = 'mtmfft'
-        cfg.output = 'pow'
-        cfg.pad = 'nextpow2'
-        cfg.parallel = True
-        cfg.polyremoval = 0
-        cfg.taper = self._taper
-        psd = np.stack(spy.freqanalysis(cfg, data).show(), axis=-1)
-        psd = pq.Quantity(np.moveaxis(psd, 0, 1), pq.mV ** 2 / pq.Hz)
+            cfg.foi = self.freqs.magnitude.squeeze()
+            cfg.ft_compat = True
+            cfg.keeptrials = 'yes'
+            cfg.method = 'mtmfft'
+            cfg.output = 'pow'
+            cfg.pad = 'nextpow2'
+            cfg.parallel = True
+            cfg.polyremoval = 0
+            cfg.taper = self._taper
+            # Temporal resolution trades off against frequency resolution.
+            cfg.t_ftimwin = self._time_window
+            psd = spy.freqanalysis(cfg, data).show()
+            if isinstance(psd, list):
+                psd = np.stack(psd, axis=-1)
+            else:
+                psd = psd[:, :, np.newaxis]
+            psd = np.moveaxis(psd, 0, 1)
+            psds.append(psd)
 
-        del xs
-        del data
+            del data
+            del trial_xs
+            spy.cleanup(interactive=False)
+
         client.close()
         del client
         cluster.close()
         del cluster
+        psd = pq.Quantity(np.concatenate(psds, axis=-1), pq.mV ** 2 / pq.Hz)
 
         if self.data is None:
             return psd
