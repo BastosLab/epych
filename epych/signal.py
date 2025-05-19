@@ -177,6 +177,11 @@ class EpochedSignal(Signal):
     def data(self):
         return self._data
 
+    def detrend(self):
+        erp = pq.Quantity(self.data.magnitude.mean(-1, keepdims=True),
+                          self.data.units)
+        return self.__replace__(data=self.data - erp)
+
     def downsample(self, n):
         channels = self.channels.loc[0::n]
         data = self.data[0::n, :, :]
@@ -261,11 +266,6 @@ class EpochedSignal(Signal):
     @property
     def num_trials(self):
         return self.data.shape[-1]
-
-    def remove_erp(self):
-        erp = pq.Quantity(self.data.magnitude.mean(-1, keepdims=True),
-                          self.data.units)
-        return self.__replace__(data=self.data - erp)
 
     def pickle(self, path):
         assert os.path.isdir(path) or not os.path.exists(path)
