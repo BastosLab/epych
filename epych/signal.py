@@ -3,10 +3,12 @@
 import collections
 import collections.abc
 import copy
+import dask.distributed as dd
 import gc
 import hdf5storage as mat
 import math
 import matplotlib.pyplot as plt
+import mne
 import numpy as np
 import os
 import pandas as pd
@@ -14,8 +16,13 @@ import pickle
 import quantities as pq
 import scipy
 from statistics import median
+import syncopy as spy
+from tqdm import tqdm
 
 from . import plotting
+
+mne.set_log_level("CRITICAL")
+NUM_WORKERS = os.cpu_count() * 3 // 4
 
 class Signal(collections.abc.Sequence):
     def __init__(self, channels: pd.DataFrame, data, dt, timestamps):
@@ -162,6 +169,52 @@ class EpochedSignal(Signal):
         def f(data):
             return data - data[:, start:stop].mean(axis=1)[:, np.newaxis, :]
         return self.fmap(f)
+
+    def band_phases(self, fmin, fmax, channel_mean=False):
+        fmin, fmax = fmin.rescale("Hz"), fmax.rescale("Hz")
+        assert self.df.rescale("Hz") <= fmin
+        cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
+        client = dd.Client(cluster)
+        trials_data = self.data
+        if channel_mean:
+            trials_data = trials_data.mean(axis=0)[np.newaxis, :, :]
+
+        channels = [str(ch) for ch in list(self.channels.index.values)]
+        phases = []
+        for c in tqdm(range(0, self.num_trials, NUM_WORKERS)):
+            trials = slice(c, c + NUM_WORKERS)
+            trial_xs = mne.EpochsArray(
+                np.moveaxis(trials_data.magnitude[:, :, trials], -1, 0),
+                mne.create_info(channels, int(self.f0.item())), proj=False,
+            )
+
+            data = spy.mne_epochs_to_tldata(trial_xs)
+            cfg = spy.get_defaults(spy.preprocessing)
+            cfg.filter_type = "bp" # Band-pass filter
+            cfg.freq = [fmin.item(), fmax.item()]
+            cfg.hilbert = "angle"
+            cfg.parallel = None
+            cfg.polyremoval = 0
+            phase = spy.preprocessing(cfg, data).show()
+            if isinstance(phase, list):
+                phase = np.stack(phase, axis=-1)
+            else:
+                phase = phase[:, :, np.newaxis]
+            phase = np.moveaxis(phase, 0, 1)
+            phases.append(phase)
+
+            del data
+            del trial_xs
+            spy.cleanup(interactive=False)
+
+        client.close()
+        del client
+        cluster.close()
+        del cluster
+
+        return self.__replace__(data=
+            pq.Quantity(np.concatenate(phases, axis=-1), pq.rad)
+        )
 
     def cat_trials(self, other):
         assert self.__class__ == other.__class__
