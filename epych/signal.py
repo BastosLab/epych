@@ -262,6 +262,11 @@ class EpochedSignal(Signal):
     def num_trials(self):
         return self.data.shape[-1]
 
+    def remove_erp(self):
+        erp = pq.Quantity(self.data.magnitude.mean(-1, keepdims=True),
+                          self.data.units)
+        return self.__replace__(data=self.data - erp)
+
     def pickle(self, path):
         assert os.path.isdir(path) or not os.path.exists(path)
         os.makedirs(path, exist_ok=True)
