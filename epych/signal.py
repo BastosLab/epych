@@ -175,11 +175,14 @@ class EpochedSignal(Signal):
         assert self.df.rescale("Hz") <= fmin
         cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
         client = dd.Client(cluster)
-        trials_data = self.data
-        if channel_mean:
-            trials_data = trials_data.mean(axis=0)[np.newaxis, :, :]
 
         channels = [str(ch) for ch in list(self.channels.index.values)]
+        trials_data = self.data
+        if channel_mean:
+            middle_channel = len(self.channels) // 2
+            channels = channels[middle_channel:(middle_channel + 1)]
+            trials_data = trials_data.mean(axis=0)[np.newaxis, :, :]
+
         phases = []
         for c in tqdm(range(0, self.num_trials, NUM_WORKERS)):
             trials = slice(c, c + NUM_WORKERS)
@@ -198,9 +201,11 @@ class EpochedSignal(Signal):
             phase = spy.preprocessing(cfg, data).show()
             if isinstance(phase, list):
                 phase = np.stack(phase, axis=-1)
+                if channel_mean:
+                    phase = phase[np.newaxis, :, :]
             else:
-                phase = phase[:, :, np.newaxis]
-            phase = np.moveaxis(phase, 0, 1)
+                phase = phase[np.newaxis, :, np.newaxis] if channel_mean else\
+                        phase[:, :, np.newaxis]
             phases.append(phase)
 
             del data
@@ -212,9 +217,19 @@ class EpochedSignal(Signal):
         cluster.close()
         del cluster
 
-        return self.__replace__(data=
-            pq.Quantity(np.concatenate(phases, axis=-1), pq.rad)
-        )
+
+        if channel_mean:
+            middle_channel = len(self.channels) // 2
+            channels = self.channels[middle_channel:(middle_channel + 1)]
+        else:
+            channels = self.channels
+
+        from .signals.phase import EpochedPhase
+
+        return EpochedPhase(channels,
+                            pq.Quantity(np.concatenate(phases, axis=-1),
+                                        pq.rad),
+                            self.dt, self.times)
 
     def cat_trials(self, other):
         assert self.__class__ == other.__class__
