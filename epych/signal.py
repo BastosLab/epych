@@ -170,24 +170,21 @@ class EpochedSignal(Signal):
             return data - data[:, start:stop].mean(axis=1)[:, np.newaxis, :]
         return self.fmap(f)
 
-    def band_phases(self, fmin, fmax, channel_mean=False):
+    def band_phases(self, fmin, fmax):
         fmin, fmax = fmin.rescale("Hz"), fmax.rescale("Hz")
         assert self.df.rescale("Hz") <= fmin
         cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
         client = dd.Client(cluster)
 
         channels = [str(ch) for ch in list(self.channels.index.values)]
-        trials_data = self.data
-        if channel_mean:
-            middle_channel = len(self.channels) // 2
-            channels = channels[middle_channel:(middle_channel + 1)]
-            trials_data = trials_data.mean(axis=0)[np.newaxis, :, :]
-
+        middle = len(self.channels) // 2
+        channels = channels[middle:middle+1]
         phases = []
         for c in tqdm(range(0, self.num_trials, NUM_WORKERS)):
             trials = slice(c, c + NUM_WORKERS)
             trial_xs = mne.EpochsArray(
-                np.moveaxis(trials_data.magnitude[:, :, trials], -1, 0),
+                np.moveaxis(self.data.magnitude[middle:middle+1, :, trials],
+                            -1, 0),
                 mne.create_info(channels, int(self.f0.item())), proj=False,
             )
 
@@ -201,11 +198,8 @@ class EpochedSignal(Signal):
             phase = spy.preprocessing(cfg, data).show()
             if isinstance(phase, list):
                 phase = np.stack(phase, axis=-1)
-                if channel_mean:
-                    phase = phase[np.newaxis, :, :]
             else:
-                phase = phase[np.newaxis, :, np.newaxis] if channel_mean else\
-                        phase[:, :, np.newaxis]
+                phase = phase[:, np.newaxis]
             phases.append(phase)
 
             del data
@@ -217,19 +211,12 @@ class EpochedSignal(Signal):
         cluster.close()
         del cluster
 
-
-        if channel_mean:
-            middle_channel = len(self.channels) // 2
-            channels = self.channels[middle_channel:(middle_channel + 1)]
-        else:
-            channels = self.channels
-
+        phases = np.concatenate(phases, axis=-1)[np.newaxis, :, :]
         from .signals.phase import EpochedPhase
 
-        return EpochedPhase(channels,
-                            pq.Quantity(np.concatenate(phases, axis=-1),
-                                        pq.rad),
-                            self.dt, self.times)
+        return EpochedPhase(self.channels[middle:(middle + 1)],
+                            pq.Quantity(phases, pq.rad), self.dt,
+                            self.times)
 
     def cat_trials(self, other):
         assert self.__class__ == other.__class__
