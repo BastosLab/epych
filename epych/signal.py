@@ -114,7 +114,7 @@ class Signal(collections.abc.Sequence):
         return self.__class__(*parameters.values())
 
     def sample_at(self, t):
-        if hasattr(self._timestamps, "units"):
+        if hasattr(self._timestamps, "units") and not hasattr(t, "units"):
             times = self._timestamps.magnitude
         else:
             times = self._timestamps
