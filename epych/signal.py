@@ -257,17 +257,24 @@ class EpochedSignal(Signal):
         timestamps = np.arange(data.shape[1]) * self.dt + time_shift
         return self.__replace__(data=data * units, times=timestamps)
 
-    def epoch_oscillations(self, period, phases, phase=np.pi):
-        period_samples = int(np.round(period / self.dt).item())
-        coordinates = np.stack(np.isclose(phases.data.magnitude, phase,
-                                          atol=1e-3).nonzero(),
-                               axis=-1)
+    def epoch_oscillations(self, period, phases, window=None):
+        coordinates = np.stack(
+            scipy.signal.argrelmax(phases.data.magnitude, axis=1),
+            axis=-1
+        )
         coordinates = pd.DataFrame(coordinates, columns=["channel", "sample",
                                                          "trial"])
-        coordinates = coordinates.sort_values(by="trial")
+        coordinates = coordinates.sort_values(by=["trial", "sample"])
         oscillations = []
+
         for i in coordinates.index:
             channel, sample, trial = coordinates.values[i]
+            if window is not None and (self.times[sample] < window[0] or\
+               self.times[sample] > window[1]):
+                   continue
+            if np.sign(phases.data.magnitude[channel, sample, trial]) !=\
+               np.sign(phases.data.magnitude[channel, sample + 1, trial]):
+                   continue
             first = self.sample_at(self.times[sample] - period / 2)
             last = self.sample_at(self.times[sample] + period / 2)
             if np.isclose(self.times[last] - self.times[first], period,
