@@ -3,10 +3,12 @@
 import collections
 import collections.abc
 import copy
+import dask.distributed as dd
 import gc
 import hdf5storage as mat
 import math
 import matplotlib.pyplot as plt
+import mne
 import numpy as np
 import os
 import pandas as pd
@@ -14,8 +16,13 @@ import pickle
 import quantities as pq
 import scipy
 from statistics import median
+import syncopy as spy
+from tqdm import tqdm
 
 from . import plotting
+
+mne.set_log_level("CRITICAL")
+NUM_WORKERS = os.cpu_count() * 3 // 4
 
 class Signal(collections.abc.Sequence):
     def __init__(self, channels: pd.DataFrame, data, dt, timestamps):
@@ -107,7 +114,7 @@ class Signal(collections.abc.Sequence):
         return self.__class__(*parameters.values())
 
     def sample_at(self, t):
-        if hasattr(self._timestamps, "units"):
+        if hasattr(self._timestamps, "units") and not hasattr(t, "units"):
             times = self._timestamps.magnitude
         else:
             times = self._timestamps
@@ -163,6 +170,56 @@ class EpochedSignal(Signal):
             return data - data[:, start:stop].mean(axis=1)[:, np.newaxis, :]
         return self.fmap(f)
 
+    def band_phases(self, fmin, fmax):
+        fmin, fmax = fmin.rescale("Hz"), fmax.rescale("Hz")
+        assert self.df.rescale("Hz") <= fmin
+        cluster = dd.LocalCluster(n_workers=NUM_WORKERS)
+        client = dd.Client(cluster)
+
+        channels = [str(ch) for ch in list(self.channels.index.values)]
+        middle = len(self.channels) // 2
+        channels = channels[middle:middle+1]
+        phases = []
+        for c in tqdm(range(0, self.num_trials, NUM_WORKERS)):
+            trials = slice(c, c + NUM_WORKERS)
+            trial_xs = mne.EpochsArray(
+                np.moveaxis(self.data.magnitude[middle:middle+1, :, trials],
+                            -1, 0),
+                mne.create_info(channels, int(self.f0.item())), proj=False,
+            )
+
+            data = spy.mne_epochs_to_tldata(trial_xs)
+            cfg = spy.get_defaults(spy.preprocessing)
+            cfg.filter_class = 'firws'
+            cfg.filter_type = "bp" # Band-pass filter
+            cfg.freq = [fmin.item(), fmax.item()]
+            cfg.hilbert = "angle"
+            cfg.parallel = None
+            cfg.polyremoval = 0
+            cfg.window = 'hann'
+            phase = spy.preprocessing(cfg, data).show()
+            if isinstance(phase, list):
+                phase = np.stack(phase, axis=-1)
+            else:
+                phase = phase[:, np.newaxis]
+            phases.append(phase)
+
+            del data
+            del trial_xs
+            spy.cleanup(interactive=False)
+
+        client.close()
+        del client
+        cluster.close()
+        del cluster
+
+        phases = np.concatenate(phases, axis=-1)[np.newaxis, :, :]
+        from .signals.phase import EpochedPhase
+
+        return EpochedPhase(self.channels[middle:(middle + 1)],
+                            pq.Quantity(phases, pq.rad), self.dt,
+                            self.times)
+
     def cat_trials(self, other):
         assert self.__class__ == other.__class__
         assert self.data.units == other.data.units
@@ -176,6 +233,11 @@ class EpochedSignal(Signal):
     @property
     def data(self):
         return self._data
+
+    def detrend(self):
+        erp = pq.Quantity(self.data.magnitude.mean(-1, keepdims=True),
+                          self.data.units)
+        return self.__replace__(data=self.data - erp)
 
     def downsample(self, n):
         channels = self.channels.loc[0::n]
@@ -196,6 +258,35 @@ class EpochedSignal(Signal):
         data = np.stack([trial[:, :time_length] for trial in data], axis=-1)
         timestamps = np.arange(data.shape[1]) * self.dt + time_shift
         return self.__replace__(data=data * units, times=timestamps)
+
+    def epoch_oscillations(self, period, phases, window=None):
+        coordinates = np.stack(
+            scipy.signal.argrelmax(phases.data.magnitude, axis=1),
+            axis=-1
+        )
+        coordinates = pd.DataFrame(coordinates, columns=["channel", "sample",
+                                                         "trial"])
+        coordinates = coordinates.sort_values(by=["trial", "sample"])
+        oscillations = []
+
+        for i in coordinates.index:
+            channel, sample, trial = coordinates.values[i]
+            if window is not None and (self.times[sample] < window[0] or\
+               self.times[sample] > window[1]):
+                   continue
+            if np.sign(phases.data.magnitude[channel, sample, trial]) !=\
+               np.sign(phases.data.magnitude[channel, sample + 1, trial]):
+                   continue
+            first = self.sample_at(self.times[sample] - period / 2)
+            last = self.sample_at(self.times[sample] + period / 2)
+            if np.isclose(self.times[last] - self.times[first], period,
+                          atol=self.dt).item():
+                oscillations.append(self.data[:, first:last, trial])
+        length = min([oscillation.shape[1] for oscillation in oscillations])
+        oscillations = np.stack([oscillation[:, :length] for oscillation in
+                                 oscillations], axis=-1) * oscillations[0].units
+        timestamps = np.arange(length) * self.dt - period / 2
+        return self.__replace__(data=oscillations, times=timestamps)
 
     def evoked(self):
         data = pq.Quantity(self.data.magnitude.mean(-1, keepdims=True),

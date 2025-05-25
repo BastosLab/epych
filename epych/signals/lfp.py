@@ -23,7 +23,7 @@ class LocalFieldPotential(signal.Signal):
             for i in range(2, self.num_channels - 2):
                 vi = (data[i-2] - 2 * data[i] + data[i+1])
                 csd_channels.append(-0.4 * vi / (2 * 0.2 ** 2))
-            csd_trials = np.stack(csd_channels, axis=0)
+            csd_trials = np.stack(csd_channels, axis=0) * (pq.A / pq.mm ** 2)
             channels = self.channels[2:-2]
         else:
             csd_trials = []
@@ -34,7 +34,7 @@ class LocalFieldPotential(signal.Signal):
             for trial in range(self.num_trials):
                 neo_lfp = AnalogSignal(data[:, :, trial].transpose(),
                                        units=units,
-                                       sampling_rate = self.f0 * pq.Hz)
+                                       sampling_rate=self.f0 * pq.Hz)
                 neo_lfp.annotate(coordinates=depths)
                 neo_lfps.append(neo_lfp)
             csd_trials = ProcessPoolExecutor().execute(estimate_csd, neo_lfps,
