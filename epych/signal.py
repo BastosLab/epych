@@ -190,11 +190,13 @@ class EpochedSignal(Signal):
 
             data = spy.mne_epochs_to_tldata(trial_xs)
             cfg = spy.get_defaults(spy.preprocessing)
+            cfg.filter_class = 'firws'
             cfg.filter_type = "bp" # Band-pass filter
             cfg.freq = [fmin.item(), fmax.item()]
             cfg.hilbert = "angle"
             cfg.parallel = None
             cfg.polyremoval = 0
+            cfg.window = 'hann'
             phase = spy.preprocessing(cfg, data).show()
             if isinstance(phase, list):
                 phase = np.stack(phase, axis=-1)
