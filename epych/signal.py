@@ -261,7 +261,7 @@ class EpochedSignal(Signal):
 
     def epoch_oscillations(self, period, phases, phase=np.pi):
         period_samples = int(np.round(period / self.dt).item())
-        coordinates = np.stack(np.isclose(phases.data.magnitude, phase,
+        coordinates = np.stack(np.isclose(np.abs(phases.data.magnitude), phase,
                                           atol=1e-3).nonzero(),
                                axis=-1)
         coordinates = pd.DataFrame(coordinates, columns=["channel", "sample",
