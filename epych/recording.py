@@ -267,7 +267,7 @@ class EvokedSampling(Sampling):
 
     def plot(self, alphas={}, vmin=None, vmax=None, dpi=100, figure=None,
              figargs={}, sigtitle=None, cmap=None, signals=None, title=None,
-             baseline=None, decimals=1, **events):
+             baseline=None, decimals=1, width_per_signal=None, **events):
         if signals is None:
             signals = list(self.signals.keys())
         if vmin is None and vmax is None:
@@ -278,11 +278,10 @@ class EvokedSampling(Sampling):
             vmaxes = np.nonzero(vlims)[0]
             vlims = np.max(vlims[vmaxes]) if len(vmaxes) else None
             vmin, vmax = (-vlims, vlims) if vlims else (None, None)
-        timespan = np.array([sig.times[-1] - sig.times[0] for sig in
-                             self.signals.values()]).sum() * 4
-        if hasattr(timespan, "units"):
-            timespan = timespan.magnitude
-        fig, axes = plt.subplot_mosaic([signals], figsize=(timespan, 3),
+        if width_per_signal is None:
+            width_per_signal = 4. * pq.point
+        plot_width = int(len(signals) * width_per_signal)
+        fig, axes = plt.subplot_mosaic([signals], figsize=(plot_width, 3),
                                        dpi=dpi, layout="compressed")
 
         for sig, ax in axes.items():
