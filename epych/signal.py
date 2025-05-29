@@ -278,7 +278,7 @@ class EpochedSignal(Signal):
         length = min([oscillation.shape[1] for oscillation in oscillations])
         oscillations = np.stack([oscillation[:, :length] for oscillation in
                                  oscillations], axis=-1) * oscillations[0].units
-        timestamps = np.arange(length) * self.dt - period / 2
+        timestamps = (np.arange(length) - period / (2  * self.dt)) * self.dt
         return self.__replace__(data=oscillations, times=timestamps)
 
     def evoked(self):
