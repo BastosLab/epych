@@ -268,13 +268,14 @@ class EpochedSignal(Signal):
                                                          "trial"])
         coordinates = coordinates.sort_values(by="trial")
         oscillations = []
+        detrended = self.data - self.data.mean(axis=-1)[:, :, np.newaxis]
         for i in coordinates.index:
             channel, sample, trial = coordinates.values[i]
             first = self.sample_at(self.times[sample] - period / 2)
             last = self.sample_at(self.times[sample] + period / 2)
             if np.isclose(self.times[last] - self.times[first], period,
                           atol=self.dt).item():
-                oscillations.append(self.data[:, first:last, trial])
+                oscillations.append(detrended[:, first:last, trial])
         length = min([oscillation.shape[1] for oscillation in oscillations])
         oscillations = np.stack([oscillation[:, :length] for oscillation in
                                  oscillations], axis=-1) * oscillations[0].units
