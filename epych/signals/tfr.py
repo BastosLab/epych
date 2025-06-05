@@ -292,10 +292,10 @@ class EvokedPower(signal.EvokedSignal):
                 filename=None, ftop=None, title=None, vlim=None, vmin=None,
                 vmax=None, baseline=None, cbar=True, cbar_ends=None,
                 tlabel="Time (milliseconds)", channel_ticks="location",
-                **events):
+                width=4, **events):
         lone = fig is None
         if fig is None:
-            fig = plt.figure(figsize=(self.plot_width * 4, 3), dpi=100)
+            fig = plt.figure(figsize=(width, 3), dpi=100)
         if alpha is not None:
             alpha = alpha.squeeze()
         if ax is None:
@@ -316,12 +316,11 @@ class EvokedPower(signal.EvokedSignal):
         ax.set_xlim(0, len(times))
         xticks = ax.get_xticks().astype(int)
         zero_tick = self.sample_at(0.)
-        zerotick_loc = ((np.array(xticks) - zero_tick) ** 2).argmin()
-        xticks = xticks.tolist()
-        xticks.insert(zerotick_loc + 1, zero_tick)
+        zerotick_loc = ((xticks - zero_tick) ** 2).argmin()
+        zerotick_offset = (xticks - zero_tick)[zerotick_loc]
+        xticks -= zerotick_offset
         if xticks[-1] >= len(times):
             xticks = xticks[:-1]
-        xticks = np.array(xticks, dtype=int)
         xtick_times = times[xticks].round(decimals=0)
         ax.set_xticks(xticks, xtick_times.magnitude.astype(int))
         ax.set_xlabel(tlabel)
