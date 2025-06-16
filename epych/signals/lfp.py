@@ -38,10 +38,11 @@ class LocalFieldPotential(signal.Signal):
                 neo_lfp.annotate(coordinates=depths)
                 neo_lfps.append(neo_lfp)
             csd_trials = ProcessPoolExecutor().execute(estimate_csd, neo_lfps,
-                                                       method=method)
+                                                       method=method,
+                                                       vaknin_el=False)
             csd_trials = np.stack([np.array(t.transpose()) for t in csd_trials],
                                   axis=-1) * csd_trials[0].units
-            channels = self.channels
+            channels = self.channels[1:-1]
         return self.__class__(channels, csd_trials, self.dt, self.times)
 
 class EpochedLfp(LocalFieldPotential, signal.EpochedSignal):
