@@ -455,9 +455,10 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
         del elements
 
         pows = pq.Quantity(np.concatenate(tfrs, axis=-1), pq.mV ** 2 / pq.Hz)
+        freqs = pq.Quantity(self.freqs, pq.Hz)
         return signals.tfr.EpochedTfr(self.channels, pows, self.df,
                                       np.diff(self.times).mean(), self.f0,
-                                      self.freqs, self.times)
+                                      freqs, self.times)
 
     @property
     def path(self):
