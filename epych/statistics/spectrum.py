@@ -291,27 +291,30 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
     def oscillatory(self, channel_mean=False, mode="fixed", space="linear"):
         if channel_mean:
             fm = fooof.FOOOF(verbose=False, aperiodic_mode=mode)
-            fm.fit(self.freqs, self.data.magnitude.mean(0).mean(-1),
-                   (self.freqs[0], self.freqs[-1]))
-            spec = self.select_freqs(fm.freqs[0], fm.freqs[-1])
+            fm.fit(self.freqs.magnitude, self.data.magnitude.mean(0).mean(-1),
+                   (self.freqs[0].magnitude, self.freqs[-1].magnitude))
+            spec = self.select_freqs(fm.freqs[0] * pq.Hz, fm.freqs[-1] * pq.Hz)
             aperiodic = fm.get_model(component='aperiodic', space=space)
             aperiodic = aperiodic[np.newaxis, :, np.newaxis]
-            return (spec.remove_aperiodic(aperiodic, space), fm.freqs,
+            freqs = pq.Quantity(fm.freqs, self.freqs.units)
+            return (spec.remove_aperiodic(aperiodic, space), freqs,
                     aperiodic)
         else:
             fg = fooof.FOOOFGroup(verbose=False, aperiodic_mode=mode)
             powers = self.data.magnitude.mean(axis=-1, keepdims=False)
-            fg.fit(self.freqs, powers, freq_range=(self.freqs[0],
-                   self.freqs[-1]), n_jobs=-1)
+            fg.fit(self.freqs.magnitude, powers,
+                   freq_range=(self.freqs[0].magnitude,
+                               self.freqs[-1].magnitude),
+                   n_jobs=-1)
 
             aperiodic = []
             for chan in range(len(fg.get_results())):
                 fm = fg.get_fooof(chan)
                 aperiodic.append(fm.get_model('aperiodic', space))
             aperiodic = np.stack(aperiodic, axis=0)[:, :, np.newaxis]
-            spec = self.select_freqs(fg.freqs[0], fg.freqs[-1])
-            return (spec.remove_aperiodic(aperiodic, space), fg.freqs,
-                    aperiodic)
+            freqs = fg.freqs * pq.Hz
+            spec = self.select_freqs(freqs[0], freqs[-1])
+            return (spec.remove_aperiodic(aperiodic, space), freqs, aperiodic)
 
     def remove_aperiodic(self, aperiodic, space="linear"):
         if space == "linear":
