@@ -227,7 +227,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
 
         band_bounds = np.unique(list(spectrum.THETA_BAND) +\
                                 list(spectrum.ALPHA_BETA_BAND) +\
-                                list(spectrum.GAMMA_BAND))
+                                list(spectrum.GAMMA_BAND)) * pq.Hz
         yfreqs = [np.nanargmin(np.abs(freqs - bound)) for bound in band_bounds]
         ax.hlines(yfreqs, *ax.get_xbound(), colors='gray', linestyles='dotted')
 
