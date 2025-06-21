@@ -1,11 +1,22 @@
 #!/usr/bin/python3
 
 import math
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2 as cv
 
 from . import colormaps
+
+def plot_sem(x, ys, ax=None, axis=-1, sems=2, **kwargs):
+
+    if ax is None:
+        ax = plt.gca()
+    mean = ys.mean(axis=axis)
+    sem = ys.std(axis=axis) / ys.shape[axis]
+    lines = ax.plot(x, mean, **kwargs)
+    ax.fill_between(x, mean - sems * sem, mean + sems * sem,
+                    color=mcolors.to_rgba(lines[0].get_color(), 0.25))
 
 def extents(f):
     delta = f[1] - f[0]
