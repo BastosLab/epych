@@ -377,6 +377,11 @@ class EpochedSignal(Signal):
     def shift_timestamps(self, offset):
         return self.__replace__(times=self.times + offset)
 
+    def significance_threshold(self, axis=-1, sems=2):
+        std = self.data.magnitude.astype("float64").std(axis=axis,
+                                                        keepdims=True)
+        return sems * std / self.data.shape[axis]
+
     def __sub__(self, sig):
         assert self.__class__ == sig.__class__
         assert (self.channels == sig.channels).all().all()
