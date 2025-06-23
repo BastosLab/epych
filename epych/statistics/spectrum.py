@@ -325,6 +325,11 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             )
         raise NotImplementedError
 
+    def select_channels(self, mask):
+        return self.__class__(self.df, self.channels.loc[mask], self.f0,
+                              data=self.data[mask, :], fmax=self.fmax,
+                              freqs=self.freqs)
+
     def select_freqs(self, low, high):
         low_idx = np.argmin(np.abs(self.freqs - low))
         high_idx = np.argmin(np.abs(self.freqs - high)) + 1

@@ -18,16 +18,18 @@ class LocalFieldPotential(signal.Signal):
 
     def current_source_density(self, depth_column=None, method="StandardCSD"):
         data = self.get_data(None, None, None)
+        channels = self.channels[1:-1]
+        diff_um = np.diff(channels.vertical.values).mean()
         if method is None:
             csd_channels = []
-            for i in range(2, self.num_channels - 2):
-                vi = (data[i-2] - 2 * data[i] + data[i+1])
-                csd_channels.append(-0.4 * vi / (2 * 0.2 ** 2))
-            csd_trials = np.stack(csd_channels, axis=0) * (pq.A / pq.mm ** 2)
-            channels = self.channels[2:-2]
+            for i in range(1, self.num_channels - 1):
+                vi = (data[i-1] - 2 * data[i] + data[i+1])
+                csd_channels.append(-0.4 * vi / (2 * diff_um ** 2))
+            csd_trials = pq.Quantity(np.stack(csd_channels, axis=0).magnitude,
+                                     data.units / pq.um ** 2)
         else:
             csd_trials = []
-            depths = self.channel_depths(depth_column)[:, np.newaxis] * pq.mm
+            depths = self.channel_depths(depth_column)[:, np.newaxis] * pq.um
             neo_lfps = []
             units = str(data.units.dimensionality) if hasattr(data, "units")\
                     else "V"
@@ -42,7 +44,6 @@ class LocalFieldPotential(signal.Signal):
                                                        vaknin_el=False)
             csd_trials = np.stack([np.array(t.transpose()) for t in csd_trials],
                                   axis=-1) * csd_trials[0].units
-            channels = self.channels[1:-1]
         return self.__class__(channels, csd_trials, self.dt, self.times)
 
 class EpochedLfp(LocalFieldPotential, signal.EpochedSignal):

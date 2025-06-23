@@ -46,6 +46,12 @@ class Signal(collections.abc.Sequence):
     def channels(self):
         return self._channels
 
+    def channel_mean(self):
+        middle_channel = len(self.channels) // 2
+        channels = self.channels[middle_channel:(middle_channel + 1)]
+        data = self.data.magnitude.mean(axis=0, keepdims=True) * self.data.units
+        return self.__replace__(channels=channels, data=data)
+
     @property
     def df(self):
         return 1. / self.T
@@ -377,6 +383,11 @@ class EpochedSignal(Signal):
     def shift_timestamps(self, offset):
         return self.__replace__(times=self.times + offset)
 
+    def significance_threshold(self, axis=-1, sems=2):
+        std = self.data.magnitude.astype("float64").std(axis=axis,
+                                                        keepdims=True)
+        return sems * std / self.data.shape[axis]
+
     def __sub__(self, sig):
         assert self.__class__ == sig.__class__
         assert (self.channels == sig.channels).all().all()
@@ -480,25 +491,30 @@ class EvokedSignal(EpochedSignal):
             laminar_labels.append(layer)
         ax.set_yticks(minortick_locs, laminar_labels, minor=True)
 
-    def line_plot(self, ax=None, fig=None, logspace=False, callback=None,
-                  title=None, vmin=None, vmax=None, **kwargs):
+    def line_plot(self, ax=None, fig=None, legend=True, logspace=False,
+                  callback=None, title=None, vmin=None, vmax=None, **kwargs):
         if ax is None:
             ax = plt.gca()
         if fig is None:
             fig = plt.gcf()
-        data = self.data.T.squeeze()
+        data = self.data.squeeze(axis=-1).T
+        times = self.times.rescale('ms')
         if logspace:
             data = np.where(data < 0., -np.log(-data), np.log(data))
-        ax.plot(self.times, data)
+        ax.plot(times, data)
         if title is not None:
             ax.set_title(title)
         if vmin is not None or vmax is not None:
             ax.set_ylim(vmin, vmax)
+        num_xticks = len(ax.get_xticks())
+        xtick_locs = np.linspace(0, data.shape[0], num_xticks)
+        xticks = np.linspace(times[0], times[-1], num_xticks)
+        xticks = ["%0.2f" % t for t in xticks]
+        ax.set_xticks(xtick_locs, xticks)
 
-        if hasattr(self.times, 'units'):
-            unit = list(self.times.units.dimensionality.keys())[0].name
-            ax.set_xlabel((unit + 's').capitalize())
-        if "location" in self.channels.columns:
+        if hasattr(times, 'units'):
+            ax.set_xlabel("Time (%s)" % times.units.dimensionality.string)
+        if "location" in self.channels.columns and legend:
             locations = [chan.decode() if isinstance(chan, bytes) else chan
                          for chan in self.channels["location"].values]
             ax.legend(locations)
