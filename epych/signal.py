@@ -491,25 +491,30 @@ class EvokedSignal(EpochedSignal):
             laminar_labels.append(layer)
         ax.set_yticks(minortick_locs, laminar_labels, minor=True)
 
-    def line_plot(self, ax=None, fig=None, logspace=False, callback=None,
-                  title=None, vmin=None, vmax=None, **kwargs):
+    def line_plot(self, ax=None, fig=None, legend=True, logspace=False,
+                  callback=None, title=None, vmin=None, vmax=None, **kwargs):
         if ax is None:
             ax = plt.gca()
         if fig is None:
             fig = plt.gcf()
-        data = self.data.T.squeeze()
+        data = self.data.squeeze(axis=-1).T
+        times = self.times.rescale('ms')
         if logspace:
             data = np.where(data < 0., -np.log(-data), np.log(data))
-        ax.plot(self.times, data)
+        ax.plot(times, data)
         if title is not None:
             ax.set_title(title)
         if vmin is not None or vmax is not None:
             ax.set_ylim(vmin, vmax)
+        num_xticks = len(ax.get_xticks())
+        xtick_locs = np.linspace(0, data.shape[0], num_xticks)
+        xticks = np.linspace(times[0], times[-1], num_xticks)
+        xticks = ["%0.2f" % t for t in xticks]
+        ax.set_xticks(xtick_locs, xticks)
 
-        if hasattr(self.times, 'units'):
-            unit = list(self.times.units.dimensionality.keys())[0].name
-            ax.set_xlabel((unit + 's').capitalize())
-        if "location" in self.channels.columns:
+        if hasattr(times, 'units'):
+            ax.set_xlabel("Time (%s)" % times.units.dimensionality.string)
+        if "location" in self.channels.columns and legend:
             locations = [chan.decode() if isinstance(chan, bytes) else chan
                          for chan in self.channels["location"].values]
             ax.legend(locations)
