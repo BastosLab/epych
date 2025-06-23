@@ -46,6 +46,12 @@ class Signal(collections.abc.Sequence):
     def channels(self):
         return self._channels
 
+    def channel_mean(self):
+        middle_channel = len(self.channels) // 2
+        channels = self.channels[middle_channel:(middle_channel + 1)]
+        data = self.data.magnitude.mean(axis=0, keepdims=True) * self.data.units
+        return self.__replace__(channels=channels, data=data)
+
     @property
     def df(self):
         return 1. / self.T
