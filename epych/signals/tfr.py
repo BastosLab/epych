@@ -145,6 +145,12 @@ class EpochedTfr(TimeFrequencyRepr, signal.EpochedSignal):
             )
         raise NotImplementedError
 
+    @classmethod
+    def unpickle(cls, path):
+        self = super(cls).unpickle(path)
+        if not hasattr(self.freqs, "units"):
+            self._freqs = pq.Quantity(self.freqs, pq.Hz)
+
 class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
     def __init__(self, channels: pd.DataFrame, data, df, dt, f0, freqs,
                  timestamps):
@@ -285,6 +291,13 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
             fig.savefig(filename, dpi=100)
         plt.show()
         plt.close(fig)
+
+    @classmethod
+    def unpickle(cls, path):
+        self = super(__class__, cls).unpickle(path)
+        if not hasattr(self.freqs, "units"):
+            self._freqs = pq.Quantity(self.freqs, pq.Hz)
+        return self
 
 class EvokedPower(signal.EvokedSignal):
     def heatmap(self, alpha=None, ax=None, cmap=None, fig=None,
