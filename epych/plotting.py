@@ -22,7 +22,8 @@ def extents(f):
     delta = f[1] - f[0]
     return [f[0] - delta/2, f[-1] + delta/2]
 
-def imagesc(ax, cs, alpha=None, cmap=None, smooth=True, **kwargs):
+def imagesc(ax, cs, alpha=None, cmap=None, smooth=True, contours=False,
+            **kwargs):
     if cmap is None:
         cmap = colormaps.parula
     if kwargs['vmin'] is None and kwargs['vmax'] is None:
@@ -35,14 +36,20 @@ def imagesc(ax, cs, alpha=None, cmap=None, smooth=True, **kwargs):
     kernel /= math.prod(kernel.shape)
     cs = cv.filter2D(cs, -1, kernel)
 
-    return ax.imshow(cs, alpha=alpha, aspect='auto', interpolation='none',
-                     extent=extents(x) + extents(y), cmap=cmap, **kwargs)
+    extent = extents(x) + extents(y)
+    result = ax.imshow(cs, alpha=alpha, aspect='auto', interpolation='none',
+                       extent=extent, cmap=cmap, **kwargs)
+    if contours and (cs != 0.).sum():
+        sem = cs.std() / np.sqrt((cs != 0.).sum())
+        levels = [-2 * sem, 2 * sem]
+        ax.contour(cs, colors='black', extent=extent, levels=levels, **kwargs)
+    return result
 
 def heatmap(fig, ax, data, alpha=None, title=None, cbar=True, vmin=-1e-4,
-            vmax=1e-4, cmap=None, smooth=True, cbar_ends=None):
+            vmax=1e-4, cmap=None, smooth=True, cbar_ends=None, contours=False):
     cbar = cbar or vmin is None or vmax is None
     img = imagesc(ax, data, alpha=alpha, vmin=vmin, vmax=vmax, origin='lower',
-                  cmap=cmap, smooth=smooth)
+                  cmap=cmap, smooth=smooth, contours=contours)
     if cbar:
         if hasattr(data, "units"):
             label = data.units.dimensionality.latex
