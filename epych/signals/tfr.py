@@ -304,7 +304,7 @@ class EvokedPower(signal.EvokedSignal):
                 filename=None, ftop=None, title=None, vlim=None, vmin=None,
                 vmax=None, baseline=None, cbar=True, cbar_ends=None,
                 tlabel="Time (milliseconds)", channel_ticks="location",
-                width=4, **events):
+                width=4, contours=False, **events):
         lone = fig is None
         if fig is None:
             fig = plt.figure(figsize=(width, 3), dpi=100)
@@ -323,7 +323,8 @@ class EvokedPower(signal.EvokedSignal):
         times = self.times.rescale("ms")
         img = plotting.heatmap(fig, ax, self.data.squeeze(), alpha=alpha,
                                cmap=cmap, title=title, vmin=vmin, vmax=vmax,
-                               cbar=cbar, cbar_ends=cbar_ends)
+                               cbar=cbar, cbar_ends=cbar_ends,
+                               contours=contours)
 
         ax.set_xlim(0, len(times))
         xticks = ax.get_xticks().astype(int)
