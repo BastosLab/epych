@@ -270,7 +270,8 @@ class EvokedSampling(Sampling):
 
     def plot(self, alphas={}, vmin=None, vmax=None, dpi=100, figure=None,
              figargs={}, sigtitle=None, cmap=None, signals=None, title=None,
-             baseline=None, decimals=1, width_per_signal=None, **events):
+             baseline=None, decimals=1, width_per_signal=None, contours=False,
+             **events):
         if signals is None:
             signals = list(self.signals.keys())
         if vmin is None and vmax is None:
@@ -295,7 +296,7 @@ class EvokedSampling(Sampling):
             img = self.signals[sig].plot(alpha=alpha, ax=ax, fig=fig,
                                          title=name, baseline=baseline,
                                          vmin=vmin, vmax=vmax, cbar=False,
-                                         cmap=cmap)
+                                         cmap=cmap, contours=contours)
             for (event, (time, color)) in events.items():
                 ymin, ymax = ax.get_ybound()
                 xtime = self.signals[sig].sample_at(time)
