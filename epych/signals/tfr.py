@@ -173,7 +173,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
     def heatmap(self, alpha=None, ax=None, cmap=None, fbottom=0, fig=None,
                 filename=None, ftop=None, title=None, vlim=None, vmin=None,
                 vmax=None, baseline=None, cbar=True, cbar_ends=None,
-                tlabel="Time (milliseconds)", **events):
+                tlabel="Time (milliseconds)", contours=False, **events):
         lone = fig is None
         if fig is None:
             fig = plt.figure(figsize=(self.plot_width * 4, 3), dpi=100)
@@ -199,7 +199,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
             title += " (% change from baseline)"
         img = plotting.heatmap(fig, ax, tfrs.T, alpha=alpha, cmap=cmap,
                                title=title, vmin=vmin, vmax=vmax, cbar=cbar,
-                               cbar_ends=cbar_ends)
+                               cbar_ends=cbar_ends, contours=contours)
 
         ax.set_xlim(0, len(times))
         xticks = ax.get_xticks().astype(int)
