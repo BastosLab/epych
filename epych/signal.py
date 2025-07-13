@@ -523,7 +523,8 @@ class EvokedSignal(EpochedSignal):
 
     def heatmap(self, alpha=None, ax=None, fig=None, filename=None, title=None,
                 vmin=None, vmax=None, origin="lower", channel_ticks="location",
-                baseline=None, cmap=None, callback=None, cbar=False):
+                baseline=None, cmap=None, callback=None, cbar=False,
+                contours=False):
         if ax is None:
             ax = plt.gca()
         figure = plt.gcf() if fig is None else fig
@@ -533,6 +534,7 @@ class EvokedSignal(EpochedSignal):
             alpha = alpha.squeeze()
         img = plotting.heatmap(figure, ax, data, alpha=alpha, title=title,
                                vmin=vmin, vmax=vmax, cmap=cmap,
+                               contours=contours,
                                cbar=cbar or (vmin is None and vmax is None))
 
         times = self.times.rescale('ms')
