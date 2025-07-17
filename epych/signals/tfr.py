@@ -350,7 +350,8 @@ class EvokedPower(signal.EvokedSignal):
             xtime = self.sample_at(time)
             ax.vlines(xtime, *ax.get_ybound(), colors=color,
                       linestyles='dashed', label=event)
-            ax.annotate(event, (xtime + 0.5, ymax - 1), color=color)
+            ax.annotate(event, (xtime + 0.5, ax.get_ybound()[1] - 1),
+                        color=color)
 
         if filename is not None:
             fig.savefig(filename, dpi=100, bbox_inches="tight")
