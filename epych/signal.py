@@ -492,11 +492,12 @@ class EvokedSignal(EpochedSignal):
         ax.set_yticks(minortick_locs, laminar_labels, minor=True)
 
     def line_plot(self, ax=None, fig=None, legend=True, logspace=False,
-                  callback=None, title=None, vmin=None, vmax=None, **kwargs):
+                  callback=None, title=None, vmin=None, vmax=None,
+                  filename=None, **kwargs):
         if ax is None:
             ax = plt.gca()
         if fig is None:
-            fig = plt.gcf()
+            figure = plt.gcf()
         data = self.data.squeeze(axis=-1).T
         times = self.times.rescale('ms')
         if logspace:
@@ -506,11 +507,6 @@ class EvokedSignal(EpochedSignal):
             ax.set_title(title)
         if vmin is not None or vmax is not None:
             ax.set_ylim(vmin, vmax)
-        num_xticks = len(ax.get_xticks())
-        xtick_locs = np.linspace(0, data.shape[0], num_xticks)
-        xticks = np.linspace(times[0], times[-1], num_xticks)
-        xticks = ["%0.2f" % t for t in xticks]
-        ax.set_xticks(xtick_locs, xticks)
 
         if hasattr(times, 'units'):
             ax.set_xlabel("Time (%s)" % times.units.dimensionality.string)
@@ -520,6 +516,11 @@ class EvokedSignal(EpochedSignal):
             ax.legend(locations)
         if callback is not None:
             callback(self, ax)
+
+        if filename is not None:
+            figure.savefig(filename)
+            if fig is None:
+                plt.close(figure)
 
     def heatmap(self, alpha=None, ax=None, fig=None, filename=None, title=None,
                 vmin=None, vmax=None, origin="lower", channel_ticks="location",
