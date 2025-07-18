@@ -525,7 +525,7 @@ class EvokedSignal(EpochedSignal):
     def heatmap(self, alpha=None, ax=None, fig=None, filename=None, title=None,
                 vmin=None, vmax=None, origin="lower", channel_ticks="location",
                 baseline=None, cmap=None, callback=None, cbar=False,
-                contours=False):
+                contours=False, xlabel=None):
         if ax is None:
             ax = plt.gca()
         figure = plt.gcf() if fig is None else fig
@@ -544,7 +544,9 @@ class EvokedSignal(EpochedSignal):
         xticks = np.linspace(times[0], times[-1], num_xticks)
         xticks = ["%0.2f" % t for t in xticks]
         ax.set_xticks(xtick_locs, xticks)
-        ax.set_xlabel("Time (%s)" % times.units.dimensionality.string)
+        if xlabel is None:
+            xlabel = "Time (%s)" % times.units.dimensionality.string
+        ax.set_xlabel(xlabel)
         if channel_ticks is not None and channel_ticks in self.channels.columns:
             self.annotate_channels(ax, channel_ticks)
 
