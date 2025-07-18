@@ -4,6 +4,7 @@ import collections
 import dask.array
 import dask.distributed as dd
 import fooof
+from fooof.sim.gen import gen_periodic
 from fooof.utils.reports import methods_report_text
 import matplotlib.pyplot as plt
 import mne
@@ -315,6 +316,41 @@ class PowerSpectrum(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             freqs = fg.freqs * pq.Hz
             spec = self.select_freqs(freqs[0], freqs[-1])
             return (spec.remove_aperiodic(aperiodic, space), freqs, aperiodic)
+
+    def peaks(self, channel_mean=False, mode="fixed"):
+        if channel_mean:
+            fm = fooof.FOOOF(verbose=False, aperiodic_mode=mode)
+            fm.fit(self.freqs.magnitude, self.data.magnitude.mean(0).mean(-1),
+                   (self.freqs[0].magnitude, self.freqs[-1].magnitude))
+            spec = self.select_freqs(fm.freqs[0] * pq.Hz, fm.freqs[-1] * pq.Hz)
+            peaks = fm.get_params("gaussian_params")
+            if len(peaks.shape) < 2:
+                peaks = peaks[np.newaxis, :]
+            peaks = peaks[np.newaxis, :, :]
+            pows = []
+            for p in range(peaks.shape[1]):
+                pows.append(gen_periodic(self.freqs.magnitude, peaks[0, p, :]))
+            pows = np.stack(pows, axis=0)
+        else:
+            fg = fooof.FOOOFGroup(verbose=False, aperiodic_mode=mode)
+            powers = self.data.magnitude.mean(axis=-1, keepdims=False)
+            fg.fit(self.freqs.magnitude, powers,
+                   freq_range=(self.freqs[0].magnitude,
+                               self.freqs[-1].magnitude),
+                   n_jobs=-1)
+
+            peaks = {}
+            pows = {}
+            for chan in range(len(fg.get_results())):
+                fm = fg.get_fooof(chan)
+                channel_peaks = fm.get_params("gaussian_params")
+                peak_pows = []
+                for p in range(channel_peaks.shape[0]):
+                    peak_pows.append(gen_periodic(self.freqs.magnitude,
+                                                  channel_peaks[p, :]))
+                peaks[chan] = channel_peaks
+                pows[chan] = np.stack(peak_pows, axis=0)
+        return peaks, pows
 
     def remove_aperiodic(self, aperiodic, space="linear"):
         if space == "linear":
