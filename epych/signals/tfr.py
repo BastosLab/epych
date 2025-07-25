@@ -172,7 +172,7 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
 
     def heatmap(self, alpha=None, ax=None, cmap=None, fbottom=0, fig=None,
                 filename=None, ftop=None, title=None, vlim=None, vmin=None,
-                vmax=None, baseline=None, cbar=True, cbar_ends=None,
+                vmax=None, baseline=None, cbar=True, cbar_ends=None, xlabel=None,
                 tlabel="Time (milliseconds)", contours=False, **events):
         lone = fig is None
         if fig is None:
@@ -304,7 +304,7 @@ class EvokedPower(signal.EvokedSignal):
                 filename=None, ftop=None, title=None, vlim=None, vmin=None,
                 vmax=None, baseline=None, cbar=True, cbar_ends=None,
                 tlabel="Time (milliseconds)", channel_ticks="location",
-                width=4, contours=False, **events):
+                width=4, contours=False, xlabel=None, **events):
         lone = fig is None
         if fig is None:
             fig = plt.figure(figsize=(width, 3), dpi=100)
