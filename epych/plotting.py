@@ -17,6 +17,7 @@ def plot_sem(x, ys, ax=None, axis=-1, sems=2, **kwargs):
     lines = ax.plot(x, mean, **kwargs)
     ax.fill_between(x, mean - sems * sem, mean + sems * sem,
                     color=mcolors.to_rgba(lines[0].get_color(), 0.25))
+    return lines
 
 def extents(f):
     delta = f[1] - f[0]
