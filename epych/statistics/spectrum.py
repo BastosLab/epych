@@ -403,7 +403,7 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
         for c in tqdm(range(0, element.num_trials, NUM_WORKERS)):
             trials = slice(c, c + NUM_WORKERS)
             trial_xs = mne.EpochsArray(
-                np.moveaxis(xs[:, :, trials], -1, 0),
+                np.moveaxis(element.data.magnitude[:, :, trials], -1, 0),
                 mne.create_info(channels, int(self.f0.item())), proj=False,
             )
 
