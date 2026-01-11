@@ -306,8 +306,11 @@ class EpochedSignal(Signal):
         if key.step is None:
             key = slice(key.start, key.stop, 1)
 
+        total_time = key.stop - key.start
         key = slice(self.sample_at(key.start), self.sample_at(key.stop),
                     key.step)
+        if self.times[key.stop] - self.times[key.start] < total_time:
+            key = slice(key.start, key.stop + 1, key.step)
         return self.__replace__(data=self.data[:, key], times=self.times[key])
 
     def mask_epochs(self, onsets, offsets):
