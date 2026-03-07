@@ -194,8 +194,10 @@ class Summary:
             fig.savefig(figure, **figargs)
         plt.close(fig)
 
-    def results(self):
-        stat_results = {k: v.result() for k, v in self.stats.items()}
+    def results(self, **kwargs):
+        stat_results = {k: v.result(**{kw: arg[k] for kw, arg
+                                       in kwargs.items()})
+                        for k, v in self.stats.items()}
         if all([isinstance(v, signal.Signal) for v in stat_results.values()]):
             trials = self._trials if self._trials is not None else\
                      recording.empty_trials()
