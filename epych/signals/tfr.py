@@ -332,7 +332,7 @@ class EvokedPower(signal.EvokedSignal):
         zerotick_loc = ((xticks - zero_tick) ** 2).argmin()
         zerotick_offset = (xticks - zero_tick)[zerotick_loc]
         xticks -= zerotick_offset
-        if xticks[-1] >= len(times):
+        while xticks[-1] >= len(times):
             xticks = xticks[:-1]
         xtick_times = times[xticks].round(decimals=0)
         ax.set_xticks(xticks, xtick_times.magnitude.astype(int))
