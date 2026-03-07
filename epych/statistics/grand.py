@@ -259,7 +259,7 @@ class GrandNonparametricClusterTest(statistic.Statistic[T]):
         signal = signal.fmap(lambda data: data * mask[:, :, np.newaxis])
         return signal.plot(**kwargs)
 
-    def result(self):
+    def result(self, cluster_min_size=None):
         if not self._result:
             lunits = self.data["left"].data.units
             ldata = self.data["left"].data.magnitude
@@ -276,6 +276,15 @@ class GrandNonparametricClusterTest(statistic.Statistic[T]):
             )
             cluster_masks = [clusters[c] for c
                              in np.where(pvals < self.alpha)[0]]
+            if cluster_min_size is not None:
+                for c, cluster_mask in enumerate(cluster_masks):
+                    cluster_sizes = cluster_mask.sum(axis=(0, 1, 2),
+                                                     keepdims=True)
+                    cluster_mask = np.where(
+                        cluster_sizes >= cluster_min_size, cluster_mask,
+                        np.zeros_like(cluster_mask, dtype=bool)
+                    )
+                    cluster_masks[c] = cluster_mask
             mask_shape = ldata.shape[:-1]
             null_mask = np.resize(np.array([False]),
                                   mask_shape[1:] + (mask_shape[0],))
@@ -283,6 +292,10 @@ class GrandNonparametricClusterTest(statistic.Statistic[T]):
             mask = np.expand_dims(np.moveaxis(mask, -1, 0), -1)
             data = (ldata.mean(axis=-1) - rdata.mean(axis=-1)) * lunits
             self._result = {
+                "cluster_size": max([cluster_mask.sum(axis=(0, 1, 2),
+                                                      keepdims=True)
+                                     for cluster_mask in cluster_masks],
+                                    default=0),
                 "mask": mask, "signal": self.data["left"].__replace__(
                     data=np.expand_dims(data, -1)
                 ).evoked()
