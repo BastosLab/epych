@@ -25,7 +25,7 @@ class GrandConcatenation(statistic.Statistic[T]):
         self._alignment = alignment
         self._dt = None
         if data is None:
-            self._data = {"channels": None, "k": 0, "cat": [],
+            self._data = {"channels": None, "k": 0, "cat": None,
                           "timestamps": np.zeros(self.iid_shape[1])}
         self._signal_class = None
 
@@ -59,10 +59,15 @@ class GrandConcatenation(statistic.Statistic[T]):
         assert hasattr(self._dt, "units")
 
         running["k"] += 1
-        if not running["cat"]:
-            running["cat"] = [data]
+        if running["cat"] is None:
+            running["cat"] = data
         else:
-            running["cat"].append(data.rescale(running["cat"][-1].units))
+            data = data.rescale(running["cat"].units)
+            running["cat"] = pq.Quantity(
+                np.concatenate((running["cat"].magnitude, data.magnitude),
+                               axis=-1),
+                data.units
+            )
         times = element.times[:self.num_times]
         if not hasattr(running["timestamps"], "units"):
             running["timestamps"] = pq.Quantity(running["timestamps"],
@@ -86,12 +91,7 @@ class GrandConcatenation(statistic.Statistic[T]):
         for column in channels.columns:
             if channels[column].values.dtype == np.int64:
                 channels[column] //= self.data["k"]
-        cat = pq.Quantity(
-            np.concatenate(tuple(data.magnitude for data in self.data["cat"]),
-                           axis=-1),
-            self.data["cat"][-1].units
-        )
-        return self._signal_class(channels, cat, self._dt, times)
+        return self._signal_class(channels, self.data["cat"], self._dt, times)
 
 class GrandAverage(statistic.Statistic[T]):
     def __init__(self, alignment: alignment.LaminarAlignment, data=None):
