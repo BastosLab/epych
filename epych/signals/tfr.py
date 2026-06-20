@@ -244,6 +244,90 @@ class EvokedTfr(TimeFrequencyRepr, signal.EvokedSignal):
             plt.close(fig)
         return img
 
+    def heatmap3d(self, alpha=0.6, ax=None, cmap=None, depth_column=None,
+                  fbottom=0, fig=None, filename=None, ftop=None, title=None,
+                  tlabel="Time (ms)", stride=1, vlim=None, vmin=None,
+                  vmax=None):
+        import matplotlib.colors as mcolors
+        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+        lone = fig is None
+        if fig is None:
+            fig = plt.figure(figsize=(12, 8), dpi=100)
+        if ax is None:
+            ax = fig.add_subplot(projection='3d')
+
+        if ftop is None:
+            ftop = self.fmax.item()
+        vlim = self.data.max().round(decimals=1) if vlim is None else vlim
+        if hasattr(vlim, 'magnitude'):
+            vlim = float(vlim.magnitude)
+        else:
+            vlim = float(vlim)
+        if vlim == 0.:
+            vlim = 1.
+        if vmax is None:
+            vmax = vlim
+        if vmin is None:
+            vmin = -vlim
+
+        if cmap is None:
+            from .. import colormaps
+            cmap_obj = colormaps.parula
+        elif isinstance(cmap, str):
+            cmap_obj = plt.get_cmap(cmap)
+        else:
+            cmap_obj = cmap
+
+        data = self.data[..., 0]  # (channels, time, freqs)
+        freqs_mag = self.freqs.magnitude if hasattr(self.freqs, 'magnitude') \
+                    else np.asarray(self.freqs)
+        times_ms = self.times.rescale("ms").magnitude
+        depths = self.channel_depths(column=depth_column).astype(float)
+
+        freq_mask = (freqs_mag >= fbottom) & (freqs_mag <= ftop)
+        data = data[:, :, freq_mask]
+        freqs_ds = freqs_mag[freq_mask][::stride]
+        times_ds = times_ms[::stride]
+        data = data[:, ::stride, ::stride]
+
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+        T_grid, F_grid = np.meshgrid(times_ds, freqs_ds, indexing='ij')
+
+        for c, depth in enumerate(depths):
+            power = data[c].magnitude if hasattr(data[c], 'magnitude') \
+                    else np.asarray(data[c])
+            face_colors = cmap_obj(norm(power))
+            D_grid = np.full_like(T_grid, depth)
+            ax.plot_surface(T_grid, F_grid, D_grid, facecolors=face_colors,
+                            alpha=alpha, shade=False, linewidth=0,
+                            antialiased=False)
+
+        ax.invert_zaxis()
+        ax.set_xlabel(tlabel)
+        ax.set_ylabel("Frequency (Hz)")
+        ax.set_zlabel("Depth" if depth_column is not None else "Channel")
+        if title is not None:
+            ax.set_title(title)
+
+        label = None
+        if hasattr(self.data, "units"):
+            label = self.data.units.dimensionality.latex
+            if "%" in label:
+                label = label.replace("%", r"\%")
+            label = label or None
+        sm = plt.cm.ScalarMappable(cmap=cmap_obj, norm=norm)
+        sm.set_array([])
+        fig.colorbar(sm, ax=ax, label=label, shrink=0.5, pad=0.15)
+
+        if filename is not None:
+            fig.savefig(filename, dpi=100, bbox_inches="tight")
+        if lone:
+            plt.show()
+            plt.close(fig)
+
+        return ax
+
     def plot(self, *args, **kwargs):
         return self.heatmap(*args, **kwargs)
 
