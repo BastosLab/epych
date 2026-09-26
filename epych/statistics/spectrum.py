@@ -476,26 +476,58 @@ class Spectrogram(statistic.ChannelwiseStatistic[signal.EpochedSignal]):
             return spy.load(self.data[0][0]).freq
         return self._freqs
 
-    def result(self):
-        elements = [spy.load(element) for element in self.data[0]]
-        times = elements[0].sampleinfo[:, 1] - elements[0].sampleinfo[:, 0]
-        shape = [len(self.channels), int(times.mean()), len(elements[0].freq)]
-        tfrs = []
-        ntrials = 0
-        for element in elements:
-            element_tfrs = element.show()
-            if isinstance(element_tfrs, list):
-                element_tfrs = np.stack(element_tfrs, axis=-1)
-            else:
-                element_tfrs = element_tfrs[:, :, :, np.newaxis]
-            element_tfrs = np.moveaxis(element_tfrs, 2, 0)
-            assert len(element_tfrs.shape) == 4
-            tfrs.append(element_tfrs)
-            ntrials += element_tfrs.shape[-1]
-            del element_tfrs
-        del elements
+    def chunks(self):
+        """Iterate over the saved TFR files, one EpochedTfr per file.
 
-        pows = pq.Quantity(np.concatenate(tfrs, axis=-1), pq.mV ** 2 / pq.Hz)
+        Reducing over trials this way (sums, means, histograms) only ever holds
+        one file's worth of trials in memory, whereas result() materializes
+        every trial of every file at once.
+        """
+        freqs = pq.Quantity(self.freqs, pq.Hz)
+        dt, times = np.diff(self.times).mean(), self.times
+        for filename in self.data[0]:
+            element = spy.load(filename)
+            pows = pq.Quantity(self._element_tfrs(element), pq.mV ** 2 / pq.Hz)
+            element._close()
+            del element
+            yield signals.tfr.EpochedTfr(self.channels, pows, self.df, dt,
+                                         self.f0, freqs, times)
+            del pows
+
+    @staticmethod
+    def _element_tfrs(element):
+        element_tfrs = element.show()
+        if isinstance(element_tfrs, list):
+            element_tfrs = np.stack(element_tfrs, axis=-1)
+        else:
+            element_tfrs = element_tfrs[:, :, :, np.newaxis]
+        element_tfrs = np.moveaxis(element_tfrs, 2, 0)
+        assert len(element_tfrs.shape) == 4
+        return element_tfrs
+
+    @property
+    def num_trials(self):
+        ntrials = 0
+        for filename in self.data[0]:
+            element = spy.load(filename)
+            ntrials += len(element.trials)
+            element._close()
+            del element
+        return ntrials
+
+    def result(self):
+        # Preallocate rather than concatenate: the concatenation would hold
+        # both the per-file chunks and their concatenation at once.
+        ntrials, pows, t = self.num_trials, None, 0
+        for tfr in self.chunks():
+            if pows is None:
+                pows = np.empty((*tfr.data.shape[:3], ntrials),
+                                dtype=tfr.data.magnitude.dtype)
+            pows[:, :, :, t:t+tfr.num_trials] = tfr.data.magnitude
+            t += tfr.num_trials
+        assert t == ntrials
+
+        pows = pq.Quantity(pows, pq.mV ** 2 / pq.Hz)
         freqs = pq.Quantity(self.freqs, pq.Hz)
         return signals.tfr.EpochedTfr(self.channels, pows, self.df,
                                       np.diff(self.times).mean(), self.f0,
